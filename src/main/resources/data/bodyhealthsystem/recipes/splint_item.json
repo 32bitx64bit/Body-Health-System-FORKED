@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SIS",
+    " S ",
+    "SIS"
+  ],
+  "key": {
+    "S": { "item": "minecraft:stick" },
+    "I": { "item": "minecraft:iron_nugget" }
+  },
+  "result": {
+    "item": "bodyhealthsystem:splint",
+    "count": 2
+  },
+  "group": "bodyhealthsystem"
+}
