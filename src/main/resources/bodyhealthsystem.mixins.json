@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "xyz.srgnis.bodyhealthsystem.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "OnApplyDamage",
+    "OnPlayerInitMixin",
+    "SaveBodyMixin",
+    "OnHealMixin",
+    "NaturalRegenMixin",
+    "ModifyAppliedDamageInvoker",
+    "PlayerTickMixin",
+    "NoHeartsMixin",
+    "OnTryUseTotemMixin",
+    "CrawlEyeHeightMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,159 @@
+package xyz.srgnis.bodyhealthsystem.body.player;
+
+import net.minecraft.entity.DamageUtil;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.damage.DamageTypes;
+import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ArmorItem;
+import net.minecraft.registry.tag.DamageTypeTags;
+import net.minecraft.stat.Stats;
+import xyz.srgnis.bodyhealthsystem.body.Body;
+import xyz.srgnis.bodyhealthsystem.body.BodyPart;
+import xyz.srgnis.bodyhealthsystem.body.BodySide;
+import xyz.srgnis.bodyhealthsystem.body.player.parts.*;
+import xyz.srgnis.bodyhealthsystem.config.Config;
+import xyz.srgnis.bodyhealthsystem.mixin.ModifyAppliedDamageInvoker;
+import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
+import xyz.srgnis.bodyhealthsystem.util.Utils;
+
+import static xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.*;
+
+public class PlayerBody extends Body {
+
+    public PlayerBody(PlayerEntity player) {
+        this.entity = player;
+    }
+    
+    public void initParts(){
+        PlayerEntity player = ((PlayerEntity) entity);
+        this.addPart(HEAD, new HeadBodyPart(player));
+        this.addPart(TORSO, new TorsoBodyPart(player));
+        this.addPart(LEFT_ARM, new ArmBodyPart(BodySide.LEFT,player));
+        this.addPart(RIGHT_ARM, new ArmBodyPart(BodySide.RIGHT,player));
+        this.addPart(LEFT_FOOT, new FootBodyPart(BodySide.LEFT,player));
+        this.addPart(RIGHT_FOOT, new FootBodyPart(BodySide.RIGHT,player));
+        this.addPart(LEFT_LEG, new LegBodyPart(BodySide.LEFT,player));
+        this.addPart(RIGHT_LEG, new LegBodyPart(BodySide.RIGHT,player));
+        this.noCriticalParts.putAll(this.parts);
+    }
+    //TODO: kill command don't kill;
+    @Override
+    public void applyDamageBySource(float amount, DamageSource source){
+        if(source==null){
+            super.applyDamageBySource(amount,source);
+            return;
+        }
+        //TODO: handle more damage sources
+        //TODO: starvation overpowered?
+        if (source.isOf(DamageTypes.FALL) || source.isOf(DamageTypes.HOT_FLOOR)) {
+            applyFallDamage(amount, source);
+        } else if (source.isOf(DamageTypes.LIGHTNING_BOLT) || source.isOf(DamageTypes.LAVA) || source.isOf(DamageTypes.FIREBALL) || source.isOf(DamageTypes.EXPLOSION) || source.isOf(DamageTypes.PLAYER_EXPLOSION)) {
+            applyDamageFullRandom(amount, source);
+        } else if (source.isOf(DamageTypes.STARVE)) {
+            applyDamageLocal(amount, source, this.getPart(TORSO));
+        } else if (source.isOf(DamageTypes.DROWN)) {
+            applyDamageLocal(Config.drowningDamage, source, this.getPart(TORSO));
+        } else if (source.isOf(DamageTypes.FLY_INTO_WALL) || source.isOf(DamageTypes.FALLING_ANVIL) || source.isOf(DamageTypes.FALLING_BLOCK) || source.isOf(DamageTypes.FALLING_STALACTITE)) {
+            applyDamageLocal(amount, source, this.getPart(HEAD));
+        } else {
+            applyDamageLocalRandom(amount, source);
+        }
+
+    }
+
+    //Progressive application of the damage from foot to torso
+    public void applyFallDamage(float amount, DamageSource source){
+        amount = amount/2;
+        float remaining;
+        remaining = takeDamage(amount, source, this.getPart(RIGHT_FOOT));
+        if(remaining > 0){remaining = takeDamage(remaining, source, this.getPart(RIGHT_LEG));}
+        if(remaining > 0){takeDamage(remaining, source, this.getPart(TORSO));}
+
+        remaining = takeDamage(amount, source, this.getPart(LEFT_FOOT));
+        if(remaining > 0){remaining = takeDamage(remaining, source, this.getPart(LEFT_LEG));}
+        if(remaining > 0){takeDamage(remaining, source, this.getPart(TORSO));}
+    }
+
+    //TODO: blindness on head critical?
+    public void applyCriticalPartsEffect(){
+        if(entity.getStatusEffect(ModStatusEffects.MORPHINE_EFFECT) == null && entity.getStatusEffect(ModStatusEffects.ADRENALINE_EFFECT) == null) {
+            int amplifier;
+            //legs and foot
+            amplifier = -1;
+            amplifier += getAmplifier(getPart(RIGHT_FOOT));
+            amplifier += getAmplifier(getPart(LEFT_FOOT));
+            amplifier += getAmplifier(getPart(RIGHT_LEG));
+            amplifier += getAmplifier(getPart(LEFT_LEG));
+            // If crawling is required, cap slowness at amplifier 1 (Slowness II)
+            if (isCrawlingRequired()) {
+                amplifier = Math.min(amplifier, 1);
+            }
+            applyStatusEffectWithAmplifier(StatusEffects.SLOWNESS, amplifier);
+
+            //arms
+            amplifier = -1;
+            amplifier += getAmplifier(getPart(RIGHT_ARM));
+            amplifier += getAmplifier(getPart(LEFT_ARM));
+            applyStatusEffectWithAmplifier(StatusEffects.MINING_FATIGUE, amplifier);
+
+            //torso
+            amplifier = -1;
+            amplifier += getAmplifier(getPart(TORSO));
+            amplifier += getAmplifier(getPart(HEAD));
+            applyStatusEffectWithAmplifier(StatusEffects.WEAKNESS, amplifier);
+        }
+    }
+
+    public boolean isCrawlingRequired() {
+        BodyPart leftLeg = getPart(LEFT_LEG);
+        BodyPart rightLeg = getPart(RIGHT_LEG);
+        BodyPart leftFoot = getPart(LEFT_FOOT);
+        BodyPart rightFoot = getPart(RIGHT_FOOT);
+        return leftLeg.getHealth() <= 0.0f && rightLeg.getHealth() <= 0.0f && leftFoot.getHealth() <= 0.0f && rightFoot.getHealth() <= 0.0f;
+    }
+
+    @Override
+    public float takeDamage(float amount, DamageSource source, BodyPart part){
+
+        PlayerEntity player = (PlayerEntity)entity;
+        //applyArmor
+        amount = applyArmorToDamage(source, amount, part);
+        float f = amount = ((ModifyAppliedDamageInvoker)entity).invokeModifyAppliedDamage(source, amount);
+
+        //Copied from PlayerEntity.applyDamage
+        amount = Math.max(amount - entity.getAbsorptionAmount(), 0.0f);
+        entity.setAbsorptionAmount(entity.getAbsorptionAmount() - (f - amount));
+        float g = f - amount;
+        if (g > 0.0f && g < 3.4028235E37f) {
+            player.increaseStat(Stats.DAMAGE_ABSORBED, Math.round(g * 10.0f));
+        }
+        if (amount == 0.0f) {
+            return amount;
+        }
+        player.addExhaustion(source.getExhaustion());
+        float h = entity.getHealth();
+        player.getDamageTracker().onDamage(source, amount);
+        if (amount < 3.4028235E37f) {
+            player.increaseStat(Stats.DAMAGE_TAKEN, Math.round(amount * 10.0f));
+        }
+
+        float remaining;
+remaining = (source.isOf(DamageTypes.MAGIC) && entity.hasStatusEffect(StatusEffects.POISON))
+        ? part.damageWithoutKill(amount)
+        : part.damage(amount);
+        return remaining;
+    }
+
+    public float applyArmorToDamage(DamageSource source, float amount, BodyPart part){
+        if(part.getAffectedArmor().getItem() instanceof ArmorItem) {
+            if (!source.isIn(DamageTypeTags.BYPASSES_ARMOR)) {
+                PlayerEntity player = (PlayerEntity)entity;
+                ArmorItem armorItem = ((ArmorItem) part.getAffectedArmor().getItem());
+                player.getInventory().damageArmor(source,amount,new int[]{part.getArmorSlot()});
+                amount = DamageUtil.getDamageLeft(amount, Utils.modifyProtection(armorItem, part.getArmorSlot()), Utils.modifyToughness(armorItem,part.getArmorSlot()));
+            }
+        }
+        return amount;
+    }
+}

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "bodyhealthsystem",
+  "version": "${version}",
+
+  "name": "Body Health System",
+  "description": "A redesign of the Minecraft health system",
+  "authors": [
+    "SrGnis"
+  ],
+  "contact": {
+    "homepage": "https://modrinth.com/mod/body-health-system",
+    "sources": "https://github.com/SrGnis/Body-Health-System"
+  },
+
+  "license": "MIT",
+  "icon": "assets/bodyhealthsystem/icon.png",
+
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "xyz.srgnis.bodyhealthsystem.BHSMain"
+    ],
+    "client": [
+      "xyz.srgnis.bodyhealthsystem.BHSClient"
+    ],
+    "modmenu": [
+      "xyz.srgnis.bodyhealthsystem.config.ModMenuEntryPoint"
+    ]
+  },
+  "mixins": [
+    "bodyhealthsystem.mixins.json"
+  ],
+
+  "depends": {
+    "fabricloader": ">=0.14.9",
+    "fabric-api": "*",
+    "minecraft": "~1.20",
+    "java": ">=17"
+  }
+}
