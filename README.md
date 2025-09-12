@@ -7,6 +7,14 @@ If some parts lose all the health debuffs will be applied to the player, as slow
 ## Download here!
 https://modrinth.com/mod/body-health-system-forked
 
+## Benefits of the fork
+
+Newly added features and QoL changes.
+
+Arrow raycast hit detection.
+
+Bug fixes.
+
 ## Crafting
 
 ### Plaster
