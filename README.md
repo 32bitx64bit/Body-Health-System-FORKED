@@ -24,4 +24,5 @@ TODO but you can check the [UML diagram](https://github.com/SrGnis/Body-Health-S
 ## Contributors
 
 Many thanks to @Blayung for his fixes of the HUD 
+
 And thanks to @SrGnis for making the original mod.
