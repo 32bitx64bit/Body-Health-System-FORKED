@@ -13,7 +13,8 @@
     "PlayerTickMixin",
     "NoHeartsMixin",
     "OnTryUseTotemMixin",
-    "CrawlEyeHeightMixin"
+    "CrawlEyeHeightMixin",
+    "ProjectileHitMixin"
   ],
   "injectors": {
     "defaultRequire": 1

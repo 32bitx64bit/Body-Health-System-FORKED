@@ -8,6 +8,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ArmorItem;
 import net.minecraft.registry.tag.DamageTypeTags;
 import net.minecraft.stat.Stats;
+import net.minecraft.util.math.Vec3d;
 import xyz.srgnis.bodyhealthsystem.body.Body;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.BodySide;
@@ -15,6 +16,7 @@ import xyz.srgnis.bodyhealthsystem.body.player.parts.*;
 import xyz.srgnis.bodyhealthsystem.config.Config;
 import xyz.srgnis.bodyhealthsystem.mixin.ModifyAppliedDamageInvoker;
 import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
+import xyz.srgnis.bodyhealthsystem.util.ProjectileHitTracker;
 import xyz.srgnis.bodyhealthsystem.util.Utils;
 
 import static xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.*;
@@ -56,6 +58,17 @@ public class PlayerBody extends Body {
             applyDamageLocal(Config.drowningDamage, source, this.getPart(TORSO));
         } else if (source.isOf(DamageTypes.FLY_INTO_WALL) || source.isOf(DamageTypes.FALLING_ANVIL) || source.isOf(DamageTypes.FALLING_BLOCK) || source.isOf(DamageTypes.FALLING_STALACTITE)) {
             applyDamageLocal(amount, source, this.getPart(HEAD));
+        } else if (source.isOf(DamageTypes.ARROW) || source.isOf(DamageTypes.MOB_PROJECTILE) || source.isOf(DamageTypes.TRIDENT) || source.getSource() instanceof net.minecraft.entity.projectile.PersistentProjectileEntity) {
+            // Route projectile damage to the part indicated by the most recent hit
+            Vec3d norm = ProjectileHitTracker.getLastHit((PlayerEntity) entity);
+            BodyPart part = selectPartFromNormalized(norm);
+            if (part != null) {
+                applyDamageLocal(amount, source, part);
+            } else {
+                applyDamageLocalRandom(amount, source);
+            }
+            // Clear after consumption to avoid stale data
+            ProjectileHitTracker.clear((PlayerEntity) entity);
         } else {
             applyDamageLocalRandom(amount, source);
         }
@@ -155,5 +168,28 @@ remaining = (source.isOf(DamageTypes.MAGIC) && entity.hasStatusEffect(StatusEffe
             }
         }
         return amount;
+    }
+
+    private BodyPart selectPartFromNormalized(Vec3d norm) {
+        if (norm == null) return null;
+        double x = norm.x; 
+        double y = norm.y; 
+
+        if (y < 0.15) {
+            // Foot
+            return this.getPart(x >= 0 ? LEFT_FOOT : RIGHT_FOOT);
+        } else if (y < 0.45) {
+            // Leg
+            return this.getPart(x >= 0 ? LEFT_LEG : RIGHT_LEG);
+        } else if (y < 0.75) {
+            // Torso band. If very lateral, count it as an arm.
+            if (Math.abs(x) > 0.585) {
+                return this.getPart(x >= 0 ? LEFT_ARM : RIGHT_ARM);
+            }
+            return this.getPart(TORSO);
+        } else {
+            // Head
+            return this.getPart(HEAD);
+        }
     }
 }
