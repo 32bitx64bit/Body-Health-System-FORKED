@@ -62,16 +62,16 @@ public class ProjectileHitMixin {
 
         ProjectileHitTracker.record(player, xNorm, yNorm, zNorm);
 
-        String bodyPart = classifyBodyPart(xNorm, yNorm);
-        if (player instanceof ServerPlayerEntity serverPlayer) {
-            serverPlayer.sendMessage(Text.literal(String.format(
-                "BHS-hit x=%.3f y=%.3f z=%.3f -> %s | best=(%.2f,%.2f,%.2f) offset=(%.3f,%.3f,%.3f) yaw=%.1f",
-                xNorm, yNorm, zNorm, bodyPart,
-                best.x, best.y, best.z,
-                offset.x, offset.y, offset.z,
-                player.getBodyYaw()
-            )), false);
-        }
+      //  String bodyPart = classifyBodyPart(xNorm, yNorm);
+       // if (player instanceof ServerPlayerEntity serverPlayer) {
+           // serverPlayer.sendMessage(Text.literal(String.format(
+               // "BHS-hit x=%.3f y=%.3f z=%.3f -> %s | best=(%.2f,%.2f,%.2f) offset=(%.3f,%.3f,%.3f) yaw=%.1f",
+              //  xNorm, yNorm, zNorm, bodyPart,
+              //  best.x, best.y, best.z,
+              //  offset.x, offset.y, offset.z,
+               // player.getBodyYaw()
+           // )), false);
+        //}
     }
 
     private static String classifyBodyPart(double xNorm, double yNorm) {
