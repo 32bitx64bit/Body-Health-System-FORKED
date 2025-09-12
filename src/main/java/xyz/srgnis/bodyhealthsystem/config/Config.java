@@ -2,6 +2,10 @@ package xyz.srgnis.bodyhealthsystem.config;
 
 public class Config extends MidnightConfig {
 
+    // Config versioning
+    public static final int CONFIG_VERSION_CURRENT = 1;
+    @Server @Entry public static int configVersion = 0;
+
     @Comment(centered = true) public static Comment comment_maxHealth;
     @Entry public static float headMaxHealth = 4;
     @Entry public static float torsoMaxHealth = 6;
@@ -37,8 +41,8 @@ public class Config extends MidnightConfig {
     @Entry public static float drowningDamage = 0.5F;
 
     @Comment(centered = true) public static Comment comment_adrenaline;
-    @Entry public static float adrenalineSecondsPerDamage = 1.0F; 
-    @Entry public static int adrenalineMaxSeconds = 30; 
+    @Entry public static float adrenalineSecondsPerDamage = 1.0F; // seconds of adrenaline per 1 damage point
+    @Entry public static int adrenalineMaxSeconds = 15; // cap duration to avoid very long effects
 
     @Comment(centered = true) public static Comment comment_vanilla;
     @Entry public static boolean forceDisableVanillaRegen = true;

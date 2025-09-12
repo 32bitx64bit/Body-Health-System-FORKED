@@ -33,7 +33,7 @@ public class OnApplyDamage {
             PlayerEntity player = (PlayerEntity)(Object)this;
             if (!player.getWorld().isClient && amount > 0) {
                 int durationTicks = (int)(amount * Config.adrenalineSecondsPerDamage * 10.0f);
-                int cap = Math.max(0, Config.adrenalineMaxSeconds * 20);
+                int cap = Math.max(0, Config.adrenalineMaxSeconds * 15);
                 StatusEffectInstance existing = player.getStatusEffect(ModStatusEffects.ADRENALINE_EFFECT);
                 if (existing != null) {
                     durationTicks += existing.getDuration();

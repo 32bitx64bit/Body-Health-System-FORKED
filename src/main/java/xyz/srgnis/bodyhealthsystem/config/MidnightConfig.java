@@ -92,6 +92,9 @@ public abstract class MidnightConfig {
         try { gson.fromJson(Files.newBufferedReader(path), config); }
         catch (Exception e) { write(modid); }
 
+        // Migrate config if version is outdated
+        migrateIfNeeded(modid, config);
+
         for (EntryInfo info : entries) {
             if (info.field.isAnnotationPresent(Entry.class))
                 try {
@@ -180,6 +183,36 @@ public abstract class MidnightConfig {
         try {
             if (!Files.exists(path)) Files.createFile(path);
             Files.write(path, gson.toJson(configClass.get(modid).getDeclaredConstructor().newInstance()).getBytes());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Version migration: if the saved config version is older than the current one, bump the version and rewrite the file.
+    private static void migrateIfNeeded(String modid, Class<?> config) {
+        try {
+            Field versionField = null;
+            try {
+                versionField = config.getDeclaredField("configVersion");
+                versionField.setAccessible(true);
+            } catch (NoSuchFieldException ignored) {}
+
+            if (versionField == null) return; 
+
+            int loadedVersion = versionField.getInt(null);
+            int currentVersion = loadedVersion;
+            try {
+                Field currentConst = config.getDeclaredField("CONFIG_VERSION_CURRENT");
+                currentConst.setAccessible(true);
+                currentVersion = currentConst.getInt(null);
+            } catch (NoSuchFieldException ignored) {}
+
+            if (loadedVersion < currentVersion) {
+                // Keep all values currently loaded into static fields
+                // New options will retain their default values as declared in the class
+                versionField.setInt(null, currentVersion);
+                write(modid); 
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

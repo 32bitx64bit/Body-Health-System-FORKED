@@ -59,6 +59,9 @@
   "bodyhealthsystem.midnightconfig.comment_adrenaline": "Adrenaline",
   "bodyhealthsystem.midnightconfig.adrenalineSecondsPerDamage": "Adrenaline seconds per damage",
   "bodyhealthsystem.midnightconfig.adrenalineMaxSeconds": "Adrenaline max seconds",
+  "bodyhealthsystem.midnightconfig.comment_vanilla": "Vanilla Behaviour",
+  "bodyhealthsystem.midnightconfig.forceDisableVanillaRegen": "Force disable vanilla natural regeneration",
+  "bodyhealthsystem.midnightconfig.configVersion": "Config version",
 
   "bodyhealthsystem.midnightconfig.comment_vanilla": "Vanilla Behaviour",
   "bodyhealthsystem.midnightconfig.forceDisableVanillaRegen": "Force disable vanilla natural regeneration"
