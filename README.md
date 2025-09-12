@@ -1,14 +1,8 @@
-# Body Health System
+# Body Health System FORKED (BHSF)
 
 This mod adds a new heath system to Minecraft.
 Players health is splitted in different body parts, when a part receives damage only the armor corresponding to that part is taken in consideration.
 If some parts lose all the health debuffs will be applied to the player, as slowness, mining fatigue and weakness.
-
-## TODO
-
-- Ray cast arrows to apply the damage to a specific part.
-- Add custom Damage Distributions for each mob.
-- Create an API and code revision.
 
 ## Crafting
 
@@ -29,4 +23,5 @@ TODO but you can check the [UML diagram](https://github.com/SrGnis/Body-Health-S
 
 ## Contributors
 
-Many thanks to @Blayung for his fixes of the HUD
+Many thanks to @Blayung for his fixes of the HUD 
+And thanks to @SrGnis for making the original mod.
