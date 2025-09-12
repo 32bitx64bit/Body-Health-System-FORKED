@@ -37,8 +37,11 @@ public class Config extends MidnightConfig {
     @Entry public static float drowningDamage = 0.5F;
 
     @Comment(centered = true) public static Comment comment_adrenaline;
-    @Entry public static float adrenalineSecondsPerDamage = 2.0F; // seconds of adrenaline per 1 damage point
-    @Entry public static int adrenalineMaxSeconds = 30; // cap duration to avoid very long effects
+    @Entry public static float adrenalineSecondsPerDamage = 1.0F; 
+    @Entry public static int adrenalineMaxSeconds = 30; 
+
+    @Comment(centered = true) public static Comment comment_vanilla;
+    @Entry public static boolean forceDisableVanillaRegen = true;
 
     @Comment(centered = true) public static Comment comment_HUDConfig;
     @Entry public static HudPosition hudPosition = HudPosition.TOP_LEFT;
