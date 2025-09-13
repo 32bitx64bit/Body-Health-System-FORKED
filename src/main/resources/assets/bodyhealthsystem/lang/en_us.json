@@ -3,11 +3,13 @@
   "item.bodyhealthsystem.morphine": "Morphine",
   "item.bodyhealthsystem.medkit": "Medkit",
   "item.bodyhealthsystem.splint": "Splint",
+  "item.bodyhealthsystem.dressing": "Dressing",
 
   "itemGroup.bodyhealthsystem.general": "Body Health System",
 
   "effect.bodyhealthsystem.morphine_effect": "Morphine",
   "effect.bodyhealthsystem.adrenaline_effect": "Adrenaline",
+  "effect.bodyhealthsystem.dressing_effect": "Dressing Applied",
 
   "bodyhealthsystem.midnightconfig.title": "Body Health System",
 

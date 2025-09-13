@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " K ",
+    "KSK",
+    " K "
+  ],
+  "key": {
+    "K": { "item": "minecraft:kelp" },
+    "S": { "item": "minecraft:string" }
+  },
+  "result": {
+    "item": "bodyhealthsystem:dressing",
+    "count": 2
+  },
+  "group": "bodyhealthsystem"
+}
