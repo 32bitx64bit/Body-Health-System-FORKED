@@ -117,5 +117,6 @@ public class DressingItem extends Item {
     @Override
     public void onStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks) {
         // Released early: do nothing
+        // test commit
     }
 }
