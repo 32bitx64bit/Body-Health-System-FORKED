@@ -1,6 +1,7 @@
 package xyz.srgnis.bodyhealthsystem;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.ItemGroup;
@@ -11,12 +12,12 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.world.GameRules;
 import org.lwjgl.glfw.GLFW;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import xyz.srgnis.bodyhealthsystem.command.DevCommands;
 import xyz.srgnis.bodyhealthsystem.config.Config;
-import xyz.srgnis.bodyhealthsystem.items.MedkitItem;
 import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
@@ -46,6 +47,15 @@ public class BHSMain implements ModInitializer {
 		ModItems.registerItems();
 		ModStatusEffects.registerStatusEffects();
 		Config.init(MOD_ID, Config.class);
+
+		// If configured, force the actual game rule to false on server start
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			if (Config.forceDisableVanillaRegen) {
+				server.getGameRules().get(GameRules.NATURAL_REGENERATION).set(false, server);
+				LOGGER.info("[{}] Disabled natural regeneration gamerule due to config", MOD_ID);
+			}
+		});
+
 		ScreenHandlers.registerScreenHandlers();
 	}
 
