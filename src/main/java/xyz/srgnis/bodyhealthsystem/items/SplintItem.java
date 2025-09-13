@@ -32,8 +32,11 @@ public class SplintItem extends Item {
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
-        NbtCompound tag = stack.getOrCreateNbt();
-        if (tag.contains(TARGET_NBT)) tag.remove(TARGET_NBT);
+        NbtCompound tag = stack.getNbt();
+        if (tag != null && tag.contains(TARGET_NBT)) {
+            tag.remove(TARGET_NBT);
+            if (tag.isEmpty()) stack.setNbt(null);
+        }
         user.setCurrentHand(hand);
         return TypedActionResult.consume(stack);
     }
@@ -71,6 +74,7 @@ public class SplintItem extends Item {
                 }
                 // Clear after use
                 tag.remove(TARGET_NBT);
+                if (tag.isEmpty()) stack.setNbt(null);
             }
 
             if (target instanceof BodyProvider) {
@@ -107,6 +111,10 @@ public class SplintItem extends Item {
 
     @Override
     public void onStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks) {
-        // If released early, do nothing (require full duration)
+        NbtCompound tag = stack.getNbt();
+        if (tag != null && tag.contains(TARGET_NBT)) {
+            tag.remove(TARGET_NBT);
+            if (tag.isEmpty()) stack.setNbt(null);
+        }
     }
 }
