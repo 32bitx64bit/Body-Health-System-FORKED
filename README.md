@@ -16,18 +16,8 @@ Arrow raycast hit detection.
 Bug fixes.
 
 ## Crafting
-
-### Plaster
-
-![plaster_crafting](docs/images/plaster_crafting.png)
-
-### Morphine
-
-![morphine_crafting](docs/images/morphine_crafting.png)
-
-### Medkit
-
-![medkit crafting](docs/images/medkit_crafting.png)
+Use JEI 
+https://modrinth.com/mod/jei
 
 ## Contributing
 TODO but you can check the [UML diagram](https://github.com/SrGnis/Body-Health-System/blob/master/docs/images/BodyHealthSystemUML.png)
