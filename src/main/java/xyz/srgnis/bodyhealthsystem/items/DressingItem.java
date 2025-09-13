@@ -32,6 +32,9 @@ public class DressingItem extends Item {
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
+        if (user.hasStatusEffect(ModStatusEffects.DRESSING_EFFECT)) {
+            return TypedActionResult.fail(stack);
+        }
         NbtCompound tag = stack.getNbt();
         if (tag != null && tag.contains(TARGET_NBT)) {
             tag.remove(TARGET_NBT);
@@ -43,6 +46,9 @@ public class DressingItem extends Item {
 
     @Override
     public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
+        if (entity.hasStatusEffect(ModStatusEffects.DRESSING_EFFECT)) {
+            return ActionResult.FAIL;
+        }
         NbtCompound tag = stack.getOrCreateNbt();
         tag.putInt(TARGET_NBT, entity.getId());
         user.setCurrentHand(hand);
@@ -71,6 +77,10 @@ public class DressingItem extends Item {
                 }
                 tag.remove(TARGET_NBT);
                 if (tag.isEmpty()) stack.setNbt(null);
+            }
+
+            if (target.hasStatusEffect(ModStatusEffects.DRESSING_EFFECT)) {
+                return stack;
             }
 
             boolean consumed = false;
