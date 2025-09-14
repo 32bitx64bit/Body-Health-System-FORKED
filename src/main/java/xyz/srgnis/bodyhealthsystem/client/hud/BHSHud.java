@@ -18,6 +18,11 @@ public class BHSHud implements HudRenderCallback {
     //TODO: select color in the parts
     @Override
     public void onHudRender(DrawContext drawContext, float v) {
+        // Hide the always-on HUD when the player inventory screen is open to avoid confusion with the inventory-side HUD
+        if (MinecraftClient.getInstance().currentScreen instanceof net.minecraft.client.gui.screen.ingame.InventoryScreen) {
+            return;
+        }
+
         setHudCords();
         BodyProvider player = (BodyProvider)MinecraftClient.getInstance().player;
 

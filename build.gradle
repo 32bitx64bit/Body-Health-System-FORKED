@@ -1,5 +1,5 @@
 plugins {
-	id 'fabric-loom' version '0.12-SNAPSHOT'
+	id 'fabric-loom' version '1.6-SNAPSHOT'
 	id 'maven-publish'
 }
 
@@ -11,6 +11,7 @@ version = project.mod_version
 group = project.maven_group
 
 repositories {
+	mavenCentral()
 	maven {url "https://maven.terraformersmc.com/releases/"}
 }
 
@@ -22,6 +23,15 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+	// Mixin Extras is required by recent Fabric API versions and some upstream mixins
+	include(modImplementation("io.github.llamalad7:mixinextras-fabric:0.3.5"))
+	// Ensure the common classes (com.llamalad7.mixinextras.*) are on the classpath in dev and packaged for prod
+	include(modImplementation("io.github.llamalad7:mixinextras-common:0.3.5"))
+	annotationProcessor "io.github.llamalad7:mixinextras-common:0.3.5"
+	// Additionally, ensure they're present on the dev runtime classpath
+	modRuntimeOnly "io.github.llamalad7:mixinextras-fabric:0.3.5"
+	modRuntimeOnly "io.github.llamalad7:mixinextras-common:0.3.5"
 
 	modImplementation ("com.terraformersmc:modmenu:${project.modmenu_version}") {
 		exclude module: "fabric-api"
@@ -46,11 +56,22 @@ tasks.withType(JavaCompile).configureEach {
 	it.options.release = 17
 }
 
+// Force Java 17 for any JavaExec tasks (e.g., runClient/runServer) if toolchains are available
+tasks.withType(JavaExec).configureEach {
+	javaLauncher = javaToolchains.launcherFor {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
 java {
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 	// if it is present.
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
+	// Ensure Java 17 toolchain is used for compile and run tasks
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
 }
 
 jar {

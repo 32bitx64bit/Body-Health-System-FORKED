@@ -16,6 +16,10 @@
     "CrawlEyeHeightMixin",
     "ProjectileHitMixin"
   ],
+  "client": [
+    "InventoryScreenHudMixin",
+    "HandledScreenAccessor"
+  ],
   "injectors": {
     "defaultRequire": 1
   }
