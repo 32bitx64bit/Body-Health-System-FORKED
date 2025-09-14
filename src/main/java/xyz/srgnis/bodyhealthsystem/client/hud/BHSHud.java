@@ -19,7 +19,9 @@ public class BHSHud implements HudRenderCallback {
     @Override
     public void onHudRender(DrawContext drawContext, float v) {
         // Hide the always-on HUD when the player inventory screen is open to avoid confusion with the inventory-side HUD
-        if (MinecraftClient.getInstance().currentScreen instanceof net.minecraft.client.gui.screen.ingame.InventoryScreen) {
+        // Only hide if the inventory HUD is enabled in config
+        if (xyz.srgnis.bodyhealthsystem.config.Config.showInventoryBodyHud &&
+                MinecraftClient.getInstance().currentScreen instanceof net.minecraft.client.gui.screen.ingame.InventoryScreen) {
             return;
         }
 

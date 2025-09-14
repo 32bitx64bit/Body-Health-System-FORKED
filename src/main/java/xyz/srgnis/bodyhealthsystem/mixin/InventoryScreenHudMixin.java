@@ -21,6 +21,7 @@ public abstract class InventoryScreenHudMixin {
 
     @Inject(method = "render(Lnet/minecraft/client/gui/DrawContext;IIF)V", at = @At("TAIL"))
     private void bhs$renderBodyHudOnInventory(DrawContext drawContext, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+        if (!xyz.srgnis.bodyhealthsystem.config.Config.showInventoryBodyHud) return;
         if (!(MinecraftClient.getInstance().player instanceof BodyProvider provider)) return;
         if (provider.getBody() == null) return;
 

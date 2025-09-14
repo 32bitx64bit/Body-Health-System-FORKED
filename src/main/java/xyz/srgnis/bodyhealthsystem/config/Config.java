@@ -3,7 +3,7 @@ package xyz.srgnis.bodyhealthsystem.config;
 public class Config extends MidnightConfig {
 
     // Config versioning
-    public static final int CONFIG_VERSION_CURRENT = 1;
+    public static final int CONFIG_VERSION_CURRENT = 2;
     @Server @Entry public static int configVersion = 0;
 
     @Comment(centered = true) public static Comment comment_maxHealth;
@@ -53,6 +53,9 @@ public class Config extends MidnightConfig {
     @Entry public static int hudYOffset = 0;
     @Entry public static float hudScale = 1;
     @Entry public static boolean hiddeVanillaHealth = true;
+
+    @Comment(centered = true) public static Comment comment_inventoryHud;
+    @Entry public static boolean showInventoryBodyHud = true;
 
     public enum HudPosition {
         TOP_RIGHT,
