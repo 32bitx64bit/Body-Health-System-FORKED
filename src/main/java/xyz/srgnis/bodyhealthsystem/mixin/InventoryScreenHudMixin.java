@@ -46,21 +46,10 @@ public abstract class InventoryScreenHudMixin {
 
         var tr = MinecraftClient.getInstance().textRenderer;
         int leftMarginNeeded = tr.getWidth(formatHealth(leftLeg)) + 3; // labels to the left (left leg only)
-        int rightMarginNeeded = tr.getWidth(formatHealth(rightLeg)) + 3; // labels to the right (right leg only)
 
-        int baseXRight = acc.getX_BHS() + acc.getBackgroundWidth_BHS() + 8; // try right side first
-        int baseXLeft = acc.getX_BHS() - 8 - bodyW; // fallback to left side
-
-        int baseX;
-        // choose side that fits within screen considering side labels too
-        if (baseXRight + bodyW + rightMarginNeeded <= screenW - 2) {
-            baseX = baseXRight;
-        } else if (baseXLeft - leftMarginNeeded >= 2) {
-            baseX = baseXLeft;
-        } else {
-            // If neither side perfectly fits, clamp on the right and let labels be clipped minimally
-            baseX = Math.min(baseXRight, Math.max(2, screenW - 2 - (bodyW + rightMarginNeeded)));
-        }
+        // Place the body HUD to the LEFT of the inventory, keeping left-side labels on-screen
+        int baseXLeft = acc.getX_BHS() - 8 - bodyW;
+        int baseX = Math.max(2 + leftMarginNeeded, baseXLeft);
 
         // Draw body part rectangles
         drawPart(drawContext, provider, PlayerBodyParts.HEAD, baseX + GUIConstants.SCALED_HEAD_X_OFFSET, baseY + GUIConstants.SCALED_HEAD_Y_OFFSET, GUIConstants.SCALED_HEAD_WIDTH, GUIConstants.SCALED_HEAD_HEIGHT);
