@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "id": "bodyhealthsystem",
+  "id": "bodyhealthsystemforked",
   "version": "${version}",
 
-  "name": "Body Health System",
+  "name": "Body Health System FORKED",
   "description": "A redesign of the Minecraft health system",
   "authors": [
-    "SrGnis"
+    "Gavinx2031"
   ],
   "contact": {
-    "homepage": "https://modrinth.com/mod/body-health-system",
-    "sources": "https://github.com/SrGnis/Body-Health-System"
+    "homepage": "https://modrinth.com/mod/body-health-system-forked",
+    "sources": "https://modrinth.com/mod/body-health-system-forked"
   },
 
   "license": "MIT",

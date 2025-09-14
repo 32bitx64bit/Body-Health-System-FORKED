@@ -24,14 +24,10 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-	// Mixin Extras is required by recent Fabric API versions and some upstream mixins
-	include(modImplementation("io.github.llamalad7:mixinextras-fabric:0.3.5"))
-	// Ensure the common classes (com.llamalad7.mixinextras.*) are on the classpath in dev and packaged for prod
-	include(modImplementation("io.github.llamalad7:mixinextras-common:0.3.5"))
-	annotationProcessor "io.github.llamalad7:mixinextras-common:0.3.5"
-	// Additionally, ensure they're present on the dev runtime classpath
-	modRuntimeOnly "io.github.llamalad7:mixinextras-fabric:0.3.5"
-	modRuntimeOnly "io.github.llamalad7:mixinextras-common:0.3.5"
+	// Mixin Extras: depend at dev/runtime, but DO NOT jar-in-jar to avoid version clashes in modpacks
+	// Let the modpack provide a single version (e.g. 0.5.0). This keeps us compatible with newer Fabric API modules
+	modImplementation "io.github.llamalad7:mixinextras-fabric:0.5.0"
+	annotationProcessor "io.github.llamalad7:mixinextras-common:0.5.0"
 
 	modImplementation ("com.terraformersmc:modmenu:${project.modmenu_version}") {
 		exclude module: "fabric-api"
