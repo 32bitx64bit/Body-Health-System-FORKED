@@ -47,9 +47,24 @@ public abstract class InventoryScreenHudMixin {
         var tr = MinecraftClient.getInstance().textRenderer;
         int leftMarginNeeded = tr.getWidth(formatHealth(leftLeg)) + 3; // labels to the left (left leg only)
 
-        // Place the body HUD to the LEFT of the inventory, keeping left-side labels on-screen
         int baseXLeft = acc.getX_BHS() - 8 - bodyW;
-        int baseX = Math.max(2 + leftMarginNeeded, baseXLeft);
+
+        boolean recipeOpen = false;
+        if ((Object) this instanceof net.minecraft.client.gui.screen.recipebook.RecipeBookProvider rbProvider) {
+            // Use the recipe book widget's open state
+            recipeOpen = rbProvider.getRecipeBookWidget() != null && rbProvider.getRecipeBookWidget().isOpen();
+        }
+
+        int baseX;
+        if (recipeOpen) {
+            final int recipeBookWidth = 147; // vanilla recipe book panel width (~147px)
+            final int gap = 18;               // small gap between panels
+            int desired = acc.getX_BHS() - gap - bodyW - recipeBookWidth - gap;
+            baseX = Math.max(2 + leftMarginNeeded, desired);
+        } else {
+            // Default: place to the left of the inventory, clamped to screen
+            baseX = Math.max(2 + leftMarginNeeded, baseXLeft);
+        }
 
         // Draw body part rectangles
         drawPart(drawContext, provider, PlayerBodyParts.HEAD, baseX + GUIConstants.SCALED_HEAD_X_OFFSET, baseY + GUIConstants.SCALED_HEAD_Y_OFFSET, GUIConstants.SCALED_HEAD_WIDTH, GUIConstants.SCALED_HEAD_HEIGHT);
