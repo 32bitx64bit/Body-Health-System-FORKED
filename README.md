@@ -19,8 +19,6 @@ Bug fixes.
 Use JEI 
 https://modrinth.com/mod/jei
 
-## Contributing
-TODO but you can check the [UML diagram](https://github.com/SrGnis/Body-Health-System/blob/master/docs/images/BodyHealthSystemUML.png)
 
 ## Contributors
 
