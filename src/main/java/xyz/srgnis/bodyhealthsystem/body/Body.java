@@ -400,8 +400,7 @@ public abstract class Body {
     public void onBoneBrokenEvent(BodyPart part) {
         // Start or accelerate the grace timer
         if (boneGraceTicksRemaining <= 0 && !bonePenaltyActive) {
-            boneGraceTicksRemaining = 24000; // as requested
-        } else {
+            boneGraceTicksRemaining = 2400; // 2 minutes at 20 tps        } else {
             // subtract 600 ticks, clamp at 0
             boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining - 600);
         }
