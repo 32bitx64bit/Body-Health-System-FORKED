@@ -175,15 +175,15 @@ remaining = (source.isOf(DamageTypes.MAGIC) && entity.hasStatusEffect(StatusEffe
         double x = norm.x; 
         double y = norm.y; 
 
-        if (y < 0.15) {
+        if (y < 0.18) {
             // Foot
             return this.getPart(x >= 0 ? LEFT_FOOT : RIGHT_FOOT);
-        } else if (y < 0.45) {
+        } else if (y < 0.50) {
             // Leg
             return this.getPart(x >= 0 ? LEFT_LEG : RIGHT_LEG);
-        } else if (y < 0.75) {
-            // Torso band. If very lateral, count it as an arm.
-            if (Math.abs(x) > 0.585) {
+        } else if (y < 0.88) {
+            // Torso band. If very lateral in the upper torso, count it as an arm.
+            if (y >= 0.60 && Math.abs(x) > 0.80) {
                 return this.getPart(x >= 0 ? LEFT_ARM : RIGHT_ARM);
             }
             return this.getPart(TORSO);

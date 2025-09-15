@@ -46,8 +46,9 @@ public class ProjectileHitMixin {
         Vec3d origin = new Vec3d(centerX, py, centerZ);
         Vec3d offset = adjustedHit.subtract(origin);
 
-        double height = Math.max(player.getHeight(), 1.8);
-        double halfWidth = Math.max(player.getWidth() * 0.5, 0.3);
+        // Pose-accurate dimensions based on the current bounding box and eye position
+        double height = Math.max(box.maxY - box.minY, 1.0E-3);
+        double halfWidth = Math.max(player.getWidth() * 0.5, 1.0E-3);
 
         double yawRad = Math.toRadians(player.getBodyYaw());
         Vec3d forward = new Vec3d(-Math.sin(yawRad), 0.0, Math.cos(yawRad)).normalize();
@@ -57,7 +58,20 @@ public class ProjectileHitMixin {
         double localZ = offset.dotProduct(forward);
 
         double xNorm = clamp(localX / halfWidth, -1.0, 1.0);
-        double yNorm = clamp((py - box.minY) / height, 0.0, 1.0);
+
+        // Compute raw normalized height and align the head band start with the player's current eye height
+        double yRaw = clamp((py - box.minY) / height, 0.0, 1.0);
+        double headStart = clamp((player.getEyeY() - box.minY) / height, 0.0, 1.0);
+        headStart = Math.min(headStart, 0.99); // avoid division by zero in extreme cases
+        final double HEAD_BAND_START = 0.88; // where our classification expects the head to begin
+        double yNorm;
+        if (yRaw <= headStart) {
+            yNorm = (headStart > 1.0E-6) ? (yRaw / headStart) * HEAD_BAND_START : 0.0;
+        } else {
+            yNorm = HEAD_BAND_START + ((yRaw - headStart) / (1.0 - headStart)) * (1.0 - HEAD_BAND_START);
+        }
+        yNorm = clamp(yNorm, 0.0, 1.0);
+
         double zNorm = clamp(localZ / halfWidth, -1.0, 1.0);
 
         ProjectileHitTracker.record(player, xNorm, yNorm, zNorm);
