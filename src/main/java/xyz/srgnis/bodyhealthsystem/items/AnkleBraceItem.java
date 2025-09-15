@@ -20,12 +20,11 @@ import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts;
 import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 
-public class SplintItem extends Item {
-    private static final String TARGET_NBT = "SplintTargetId";
-    private static final int USE_TICKS = 60; // 3 seconds
-    // Removed healing from splint; only fixes broken arms/legs
+public class AnkleBraceItem extends Item {
+    private static final String TARGET_NBT = "AnkleBraceTargetId";
+    private static final int USE_TICKS = 40; // 2 seconds
 
-    public SplintItem(Settings settings) {
+    public AnkleBraceItem(Settings settings) {
         super(settings);
     }
 
@@ -72,35 +71,22 @@ public class SplintItem extends Item {
                 if (e instanceof LivingEntity) {
                     target = (LivingEntity) e;
                 }
-                // Clear after use
                 tag.remove(TARGET_NBT);
                 if (tag.isEmpty()) stack.setNbt(null);
             }
 
             if (target instanceof BodyProvider) {
                 Body body = ((BodyProvider) target).getBody();
-
-                // Fix broken bones on arms and legs
-                BodyPart la = body.getPart(PlayerBodyParts.LEFT_ARM);
-                BodyPart ra = body.getPart(PlayerBodyParts.RIGHT_ARM);
-                BodyPart ll = body.getPart(PlayerBodyParts.LEFT_LEG);
-                BodyPart rl = body.getPart(PlayerBodyParts.RIGHT_LEG);
+                BodyPart left = body.getPart(PlayerBodyParts.LEFT_FOOT);
+                BodyPart right = body.getPart(PlayerBodyParts.RIGHT_FOOT);
                 boolean fixed = false;
-
-                if (la != null && la.isBroken()) { la.setBroken(false); la.setBrokenTopHalf(null); la.setHealth(Math.max(1.0f, la.getHealth())); fixed = true; }
-                if (ra != null && ra.isBroken()) { ra.setBroken(false); ra.setBrokenTopHalf(null); ra.setHealth(Math.max(1.0f, ra.getHealth())); fixed = true; }
-                if (ll != null && ll.isBroken()) { ll.setBroken(false); ll.setBrokenTopHalf(null); ll.setHealth(Math.max(1.0f, ll.getHealth())); fixed = true; }
-                if (rl != null && rl.isBroken()) { rl.setBroken(false); rl.setBrokenTopHalf(null); rl.setHealth(Math.max(1.0f, rl.getHealth())); fixed = true; }
-
-                if (fixed) {
+                if (left != null && left.isBroken()) { left.setBroken(false); left.setBrokenTopHalf(null); left.setHealth(Math.max(1.0f, left.getHealth())); fixed = true; }
+                if (right != null && right.isBroken()) { right.setBroken(false); right.setBrokenTopHalf(null); right.setHealth(Math.max(1.0f, right.getHealth())); fixed = true; }
+                if (fixed && target instanceof PlayerEntity) {
                     body.onBoneTreatmentApplied();
-                    body.updateHealth();
-
-                    if (target instanceof PlayerEntity) {
-                        ServerNetworking.syncBody((PlayerEntity) target);
-                    }
+                    ServerNetworking.syncBody((PlayerEntity) target);
                     stack.decrement(1);
-                    world.playSound(null, target.getBlockPos(), SoundEvents.BLOCK_WOOL_PLACE, SoundCategory.PLAYERS, 1.0f, 1.0f);
+                    world.playSound(null, target.getBlockPos(), SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, SoundCategory.PLAYERS, 1.0f, 1.0f);
                 }
             }
         }

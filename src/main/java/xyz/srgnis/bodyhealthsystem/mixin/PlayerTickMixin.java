@@ -20,7 +20,8 @@ public class PlayerTickMixin {
     public void onTick(CallbackInfo ci){
         PlayerEntity player = (PlayerEntity) (Object) this;
         Body body = ((BodyProvider)player).getBody();
-        body.applyCriticalPartsEffect();
+        // Replace damage-based effects with bone-based system
+        body.applyBrokenBonesEffects();
 
         // Force crawling if both legs and both feet are broken (health <= 0)
         BodyPart leftLeg = body.getPart(PlayerBodyParts.LEFT_LEG);

@@ -4,6 +4,9 @@
   "item.bodyhealthsystem.medkit": "Medkit",
   "item.bodyhealthsystem.splint": "Splint",
   "item.bodyhealthsystem.dressing": "Dressing",
+  "item.bodyhealthsystem.medkit_upgraded": "Upgraded Medkit",
+  "item.bodyhealthsystem.ankle_brace": "Ankle Brace",
+  "item.bodyhealthsystem.chest_brace": "Chest Brace",
 
   "itemGroup.bodyhealthsystem.general": "Body Health System",
 

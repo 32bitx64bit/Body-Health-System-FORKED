@@ -30,10 +30,18 @@ public class ClientNetworking {
             Identifier id = buf.readIdentifier();
             float health = buf.readFloat();
             float maxhealth = buf.readFloat();
+            boolean broken = buf.readBoolean();
+            boolean hasHalf = buf.readBoolean();
+            boolean topHalf = hasHalf && buf.readBoolean();
 
             //TODO: Add config sync at join and remove setMaxHealth on ClientNetworking.handleHealthChange
-            client.execute(() -> ((BodyProvider) entity).getBody().getPart(id).setMaxHealth(maxhealth));
-            client.execute(() -> ((BodyProvider) entity).getBody().getPart(id).setHealth(health));
+            client.execute(() -> {
+                var part = ((BodyProvider) entity).getBody().getPart(id);
+                part.setMaxHealth(maxhealth);
+                part.setHealth(health);
+                part.setBroken(broken);
+                part.setBrokenTopHalf(hasHalf ? topHalf : null);
+            });
         }
     }
 
@@ -42,10 +50,18 @@ public class ClientNetworking {
             Identifier id = buf.readIdentifier();
             float health = buf.readFloat();
             float maxhealth = buf.readFloat();
+            boolean broken = buf.readBoolean();
+            boolean hasHalf = buf.readBoolean();
+            boolean topHalf = hasHalf && buf.readBoolean();
 
             //TODO: Add config sync at join and remove setMaxHealth on ClientNetworking.handleHealthChange
-            client.execute(() -> ((BodyProvider) client.player).getBody().getPart(id).setMaxHealth(maxhealth));
-            client.execute(() -> ((BodyProvider) client.player).getBody().getPart(id).setHealth(health));
+            client.execute(() -> {
+                var part = ((BodyProvider) client.player).getBody().getPart(id);
+                part.setMaxHealth(maxhealth);
+                part.setHealth(health);
+                part.setBroken(broken);
+                part.setBrokenTopHalf(hasHalf ? topHalf : null);
+            });
         }
     }
 

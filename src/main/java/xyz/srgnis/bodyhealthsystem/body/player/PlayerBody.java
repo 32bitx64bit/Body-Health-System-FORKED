@@ -90,32 +90,7 @@ public class PlayerBody extends Body {
 
     //TODO: blindness on head critical?
     public void applyCriticalPartsEffect(){
-        if(entity.getStatusEffect(ModStatusEffects.MORPHINE_EFFECT) == null && entity.getStatusEffect(ModStatusEffects.ADRENALINE_EFFECT) == null) {
-            int amplifier;
-            //legs and foot
-            amplifier = -1;
-            amplifier += getAmplifier(getPart(RIGHT_FOOT));
-            amplifier += getAmplifier(getPart(LEFT_FOOT));
-            amplifier += getAmplifier(getPart(RIGHT_LEG));
-            amplifier += getAmplifier(getPart(LEFT_LEG));
-            // If crawling is required, cap slowness at amplifier 1 (Slowness II)
-            if (isCrawlingRequired()) {
-                amplifier = Math.min(amplifier, 1);
-            }
-            applyStatusEffectWithAmplifier(StatusEffects.SLOWNESS, amplifier);
-
-            //arms
-            amplifier = -1;
-            amplifier += getAmplifier(getPart(RIGHT_ARM));
-            amplifier += getAmplifier(getPart(LEFT_ARM));
-            applyStatusEffectWithAmplifier(StatusEffects.MINING_FATIGUE, amplifier);
-
-            //torso
-            amplifier = -1;
-            amplifier += getAmplifier(getPart(TORSO));
-            amplifier += getAmplifier(getPart(HEAD));
-            applyStatusEffectWithAmplifier(StatusEffects.WEAKNESS, amplifier);
-        }
+        // Deprecated: Replaced by bone-based negative effects in Body.applyBrokenBonesEffects()
     }
 
     public boolean isCrawlingRequired() {
@@ -151,10 +126,48 @@ public class PlayerBody extends Body {
             player.increaseStat(Stats.DAMAGE_TAKEN, Math.round(amount * 10.0f));
         }
 
-        float remaining;
-remaining = (source.isOf(DamageTypes.MAGIC) && entity.hasStatusEffect(StatusEffects.POISON))
-        ? part.damageWithoutKill(amount)
-        : part.damage(amount);
+        float previousHealth = part.getHealth();
+        float remaining = (source.isOf(DamageTypes.MAGIC) && entity.hasStatusEffect(StatusEffects.POISON))
+                ? part.damageWithoutKill(amount)
+                : part.damage(amount);
+
+        // Evaluate bone break state (skull exempt)
+        if (!part.getIdentifier().equals(HEAD)) {
+            float max = part.getMaxHealth();
+            float newHealth = part.getHealth();
+
+            if (newHealth <= 0.0f) {
+                boolean wasBroken = part.isBroken();
+                part.setBroken(true);
+                // For arms, assign which half is broken if not set yet
+                if (part.getIdentifier().equals(LEFT_ARM) || part.getIdentifier().equals(RIGHT_ARM)) {
+                    if (part.getBrokenTopHalf() == null) part.setBrokenTopHalf(entity.getRandom().nextBoolean());
+                }
+                if (!wasBroken) this.onBoneBrokenEvent(part);
+            } else {
+                float healthRatio = previousHealth / max; // 0..1
+                float baseChance = 0.0f;
+                if (healthRatio < 1.0f) {
+                    if (healthRatio >= 0.5f) {
+                        baseChance = (1.0f - healthRatio) * (0.3f / 0.5f); // 0.5 -> 0.3, 1.0 -> 0
+                    } else {
+                        baseChance = 0.3f + (0.5f - healthRatio) * (0.7f / 0.5f); // 0.5 -> 0.3, 0 -> 1.0
+                    }
+                }
+                float damageRatio = Math.min(amount / max, 1.0f);
+                float bonus = 0.15f * damageRatio; // 0..0.15
+                float chance = Math.min(baseChance + bonus, 1.0f);
+
+                if (entity.getRandom().nextFloat() < chance) {
+                    boolean wasBroken = part.isBroken();
+                    part.setBroken(true);
+                    if (part.getIdentifier().equals(LEFT_ARM) || part.getIdentifier().equals(RIGHT_ARM)) {
+                        if (part.getBrokenTopHalf() == null) part.setBrokenTopHalf(entity.getRandom().nextBoolean());
+                    }
+                    if (!wasBroken) this.onBoneBrokenEvent(part);
+                }
+            }
+        }
         return remaining;
     }
 

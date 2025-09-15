@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "sws",
+    "sws",
+    "   "
+  ],
+  "key": {
+    "s": { "item": "minecraft:string" },
+    "w": { "item": "minecraft:white_wool" }
+  },
+  "result": {
+    "item": "bodyhealthsystem:chest_brace",
+    "count": 1
+  }
+}

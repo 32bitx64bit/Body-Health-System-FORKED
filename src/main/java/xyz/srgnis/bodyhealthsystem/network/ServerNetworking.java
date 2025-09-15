@@ -17,6 +17,7 @@ import net.minecraft.util.Identifier;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
+import xyz.srgnis.bodyhealthsystem.registry.ModItems;
 
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
 
@@ -43,6 +44,11 @@ public class ServerNetworking {
             buf.writeIdentifier(part.getIdentifier());
             buf.writeFloat(part.getHealth());
             buf.writeFloat(part.getMaxHealth());
+            // bone state
+            buf.writeBoolean(part.isBroken());
+            boolean hasHalf = part.getBrokenTopHalf() != null;
+            buf.writeBoolean(hasHalf);
+            if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
         }
         //Handled by ClientNetworking.handleHealthChange
         ServerPlayNetworking.send(player, id("data_request"), buf);
@@ -54,16 +60,49 @@ public class ServerNetworking {
         Identifier partID = packetByteBuf.readIdentifier();
         ItemStack itemStack = packetByteBuf.readItemStack();
 
-        if(((BodyProvider) entity).getBody().getPart(partID).isDamaged()) {
-            ((BodyProvider) entity).getBody().healPart(4, partID);
+        if (!(entity instanceof BodyProvider)) return;
+        var body = ((BodyProvider) entity).getBody();
+        BodyPart part = body.getPart(partID);
+        if (part == null) return;
+
+        boolean isUpgraded = itemStack.getItem() == ModItems.UPGRADED_MEDKIT_ITEM;
+
+        if (isUpgraded) {
+            boolean didSomething = false;
+            // Fix bone if broken
+            if (part.isBroken()) {
+                part.setBroken(false);
+                part.setBrokenTopHalf(null);
+                part.setHealth(Math.max(1.0f, part.getHealth()));
+                body.onBoneTreatmentApplied();
+                didSomething = true;
+            }
+            // Heal some HP as base medkit
+            if (part.getHealth() < part.getMaxHealth()) {
+                body.healPart(4, partID);
+                didSomething = true;
+            }
+            if (didSomething) {
+                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
+                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
+                }else{
+                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
+                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+                }
+                syncBody((PlayerEntity) entity);
+            }
+            return;
+        }
+
+        // Default medkit behaviour: heal only when damaged
+        if (part.isDamaged()) {
+            body.healPart(4, partID);
             if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
                 serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
             }else{
                 int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+                if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
             }
-            //TODO: syncBody call should be in healPart method?
-            //FIXME: this cast will cause problems
             syncBody((PlayerEntity) entity);
         }
     }
@@ -79,6 +118,11 @@ public class ServerNetworking {
             buf.writeIdentifier(part.getIdentifier());
             buf.writeFloat(part.getHealth());
             buf.writeFloat(part.getMaxHealth());
+            // bone state
+            buf.writeBoolean(part.isBroken());
+            boolean hasHalf = part.getBrokenTopHalf() != null;
+            buf.writeBoolean(hasHalf);
+            if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
         }
         //Handled by ClientNetworking.handleHealthChange
         ServerPlayNetworking.send( (ServerPlayerEntity) pe, BHSMain.MOD_IDENTIFIER, buf);

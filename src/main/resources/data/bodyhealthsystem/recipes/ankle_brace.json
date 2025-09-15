@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " S ",
+    " I ",
+    " SS"
+  ],
+  "key": {
+    "S": { "item": "minecraft:stick" },
+    "I": { "item": "minecraft:iron_nugget" }
+  },
+  "result": {
+    "item": "bodyhealthsystem:ankle_brace",
+    "count": 1
+  }
+}

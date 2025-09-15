@@ -25,6 +25,11 @@ public abstract class Body {
     protected HashMap<Identifier, BodyPart> noCriticalParts = new HashMap<>();
     protected LivingEntity entity;
 
+    // Bone system timers (server authoritative, not persisted)
+    protected int boneGraceTicksRemaining = 0; // counts down after a break
+    protected boolean bonePenaltyActive = false; // once grace hits 0, periodic health loss active
+    protected int bonePenaltyTickCounter = 0; // counts to 10s windows
+
     public abstract void initParts();
 
     public void addPart(Identifier identifier, BodyPart part){
@@ -178,7 +183,7 @@ public abstract class Body {
             return amount;
         }
 
-        float h = part.getHealth();
+        float previousHealth = part.getHealth();
         float remaining;
         //TODO: This could mistake other magic damage as poison, is a better way of doing this?
         if(source.isOf(DamageTypes.MAGIC) && entity.getStatusEffect(StatusEffects.POISON) != null) {
@@ -187,6 +192,10 @@ public abstract class Body {
             remaining = part.damage(amount);
         }
 
+        // After damage is applied, evaluate bone break chance (except skull)
+        if (!part.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) {
+            evaluateBoneBreak(part, previousHealth, amount);
+        }
 
         entity.getDamageTracker().onDamage(source, amount);
         entity.setAbsorptionAmount(entity.getAbsorptionAmount() - amount);
@@ -195,9 +204,134 @@ public abstract class Body {
         return remaining;
     }
 
+    private void evaluateBoneBreak(BodyPart part, float previousHealth, float rawDamage) {
+        float max = part.getMaxHealth();
+        float newHealth = part.getHealth();
+
+        // If this hit would reduce the part to 0, always break
+        if (newHealth <= 0.0f) {
+            part.setBroken(true);
+            if (isArm(part)) assignArmBrokenHalf(part);
+            return;
+        }
+
+        // Health ratio BEFORE the hit
+        float healthRatio = previousHealth / max; // 0..1
+
+        // Base chance: 0% at 100% health, 30% at 50% health, scales linearly to 100% at 0
+        float baseChance = 0.0f;
+        if (healthRatio < 1.0f) {
+            // Map 1.0 -> 0, 0.5 -> 0.3, 0.0 -> 1.0 (monotonic increasing as health decreases)
+            if (healthRatio >= 0.5f) {
+                // Between 50% and 100% health, interpolate 0.3 -> 0
+                baseChance = (1.0f - healthRatio) * (0.3f / 0.5f); // at 0.5 -> 0.3, at 1.0 -> 0
+            } else {
+                // Below 50% health, ramp towards 100% as health goes to 0
+                baseChance = 0.3f + (0.5f - healthRatio) * (0.7f / 0.5f); // at 0.5 -> 0.3, at 0 -> 1.0
+            }
+        }
+
+        // Damage bonus: additional up to 15% based on incoming raw damage relative to max health
+        float damageRatio = Math.min(rawDamage / max, 1.0f);
+        float bonus = 0.15f * damageRatio; // 0..0.15
+
+        float chance = Math.min(baseChance + bonus, 1.0f);
+
+        if (entity.getRandom().nextFloat() < chance) {
+            part.setBroken(true);
+            if (isArm(part)) assignArmBrokenHalf(part);
+        }
+    }
+
+    private boolean isArm(BodyPart part) {
+        var id = part.getIdentifier();
+        return id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM)
+                || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM);
+    }
+
+    private void assignArmBrokenHalf(BodyPart part) {
+        if (part.getBrokenTopHalf() == null) {
+            part.setBrokenTopHalf(entity.getRandom().nextBoolean());
+        }
+    }
+
     public abstract float applyArmorToDamage(DamageSource source, float amount, BodyPart part);
 
     public abstract void applyCriticalPartsEffect();
+
+    // Apply bone-based negative effects and timers. Call this each tick on server.
+    public void applyBrokenBonesEffects() {
+        if (!(entity instanceof net.minecraft.entity.player.PlayerEntity player)) return;
+        if (entity.getWorld().isClient) return; // server-side control
+
+        // If no bones are broken, deactivate timers and clear bone-based negatives
+        if (!anyBoneBroken()) {
+            bonePenaltyActive = false;
+            boneGraceTicksRemaining = 0;
+            bonePenaltyTickCounter = 0;
+            // Clear bone-based effects
+            player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS);
+            player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE);
+            player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.WEAKNESS);
+            return;
+        }
+
+        // Grace countdown before penalty starts
+        if (!bonePenaltyActive) {
+            if (boneGraceTicksRemaining > 0) {
+                boneGraceTicksRemaining--;
+            } else {
+                bonePenaltyActive = true;
+                bonePenaltyTickCounter = 0;
+            }
+        }
+
+
+        // Slowness: each broken bone adds +1 amplifier level (amplifier is level-1)
+        int brokenCount = brokenBonesCount();
+        if (brokenCount > 0) {
+            int amp = Math.max(0, brokenCount - 1);
+            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, amp, false, false));
+        }
+
+        // Arms: mining fatigue
+        int brokenArms = countBrokenArms();
+        if (brokenArms > 0) {
+            int amp = Math.max(0, brokenArms - 1);
+            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                    net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE, 40, amp, false, false));
+        }
+
+        // Torso: weakness II when torso bone is broken
+        if (isTorsoBroken()) {
+            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                    net.minecraft.entity.effect.StatusEffects.WEAKNESS, 40, 1, false, false));
+        }
+
+        // Feet: if BOTH feet are broken, add Slowness I extra (stacks with overall slowness)
+        if (bothFeetBroken()) {
+            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, 0, false, false));
+        }
+
+        // Periodic health penalty once grace elapsed
+        if (bonePenaltyActive) {
+            bonePenaltyTickCounter++;
+            if (bonePenaltyTickCounter >= 200) { // every 10 seconds
+                bonePenaltyTickCounter = 0;
+                int stacks = brokenBonesCount();
+                if (stacks > 0) {
+                    float damage = 0.5f * stacks;
+                    float newHealth = player.getHealth() - damage;
+                    player.setHealth(Math.max(0.0f, newHealth));
+                    if (player.getHealth() <= 0.0f) {
+                        player.onDeath(player.getDamageSources().generic());
+                    }
+                }
+            }
+        }
+    }
 
     public void applyStatusEffectWithAmplifier(StatusEffect effect, int amplifier){
         if(amplifier >= 0){
@@ -260,5 +394,73 @@ public abstract class Body {
             if( part.getHealth() < 1.0F) part.setHealth(1.0F);
         }
         this.updateHealth();
+    }
+
+    // Called when a bone becomes broken (transition false -> true)
+    public void onBoneBrokenEvent(BodyPart part) {
+        // Start or accelerate the grace timer
+        if (boneGraceTicksRemaining <= 0 && !bonePenaltyActive) {
+            boneGraceTicksRemaining = 24000; // as requested
+        } else {
+            // subtract 600 ticks, clamp at 0
+            boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining - 600);
+        }
+        // Apply a one-time 5s blindness when a bone breaks
+        if (entity instanceof net.minecraft.entity.player.PlayerEntity player && !entity.getWorld().isClient) {
+            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                    net.minecraft.entity.effect.StatusEffects.BLINDNESS, 100, 0, false, false));
+        }
+    }
+
+    // Called when "treatment" is applied (e.g., splint), extends grace
+    public void onBoneTreatmentApplied() {
+        // Only extend while in grace (not strictly required)
+        boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining) + 320;
+    }
+
+    protected int countBrokenArms() {
+        int c = 0;
+        BodyPart la = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM);
+        BodyPart ra = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM);
+        if (la != null && la.isBroken()) c++;
+        if (ra != null && ra.isBroken()) c++;
+        return c;
+    }
+
+    protected int countBrokenLegs() {
+        int c = 0;
+        BodyPart ll = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG);
+        BodyPart rl = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG);
+        if (ll != null && ll.isBroken()) c++;
+        if (rl != null && rl.isBroken()) c++;
+        return c;
+    }
+
+    protected boolean bothFeetBroken() {
+        BodyPart lf = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT);
+        BodyPart rf = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
+        return lf != null && rf != null && lf.isBroken() && rf.isBroken();
+    }
+
+    protected boolean isTorsoBroken() {
+        BodyPart t = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+        return t != null && t.isBroken();
+    }
+
+    protected boolean anyBoneBroken() {
+        for (BodyPart p : getParts()) {
+            if (!p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && p.isBroken()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    protected int brokenBonesCount() {
+        int c = 0;
+        for (BodyPart p : getParts()) {
+            if (!p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && p.isBroken()) c++;
+        }
+        return c;
     }
 }

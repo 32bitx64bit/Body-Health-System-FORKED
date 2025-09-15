@@ -12,12 +12,23 @@ import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts;
 import xyz.srgnis.bodyhealthsystem.constants.GUIConstants;
+import net.minecraft.util.Identifier;
+import xyz.srgnis.bodyhealthsystem.BHSMain;
 
 import static xyz.srgnis.bodyhealthsystem.util.Draw.drawHealthRectangle;
 import static xyz.srgnis.bodyhealthsystem.util.Draw.selectHealthColor;
 
 @Mixin(InventoryScreen.class)
 public abstract class InventoryScreenHudMixin {
+
+    private static final Identifier TEX_BONEMAIN = new Identifier(BHSMain.MOD_ID, "textures/gui/bonemain.png");
+    private static final Identifier TEX_RIBCAGE = new Identifier(BHSMain.MOD_ID, "textures/gui/ribcage.png");
+    private static final Identifier TEX_SKULL = new Identifier(BHSMain.MOD_ID, "textures/gui/skull.png");
+    private static final Identifier TEX_FOOT = new Identifier(BHSMain.MOD_ID, "textures/gui/foot.png");
+
+    private static final Identifier TEX_BONEMAIN_BROKEN = new Identifier(BHSMain.MOD_ID, "textures/gui/bonemainbroken.png");
+    private static final Identifier TEX_RIBCAGE_BROKEN = new Identifier(BHSMain.MOD_ID, "textures/gui/ribcagebroken.png");
+    private static final Identifier TEX_FOOT_BROKEN = new Identifier(BHSMain.MOD_ID, "textures/gui/footbroken.png");
 
     @Inject(method = "render(Lnet/minecraft/client/gui/DrawContext;IIF)V", at = @At("TAIL"))
     private void bhs$renderBodyHudOnInventory(DrawContext drawContext, int mouseX, int mouseY, float delta, CallbackInfo ci) {
@@ -141,7 +152,74 @@ public abstract class InventoryScreenHudMixin {
     private static void drawPart(DrawContext ctx, BodyProvider provider, net.minecraft.util.Identifier partId, int x, int y, int w, int h) {
         BodyPart p = provider.getBody().getPart(partId);
         int color = selectHealthColor(p);
+        // Draw health rectangle as background
         drawHealthRectangle(ctx, x, y, w, h, color);
+
+        boolean broken = p.isBroken();
+        // Overlay bone texture for this part
+        Identifier tex = selectBoneTexture(partId, broken);
+        if (isDrawableResource(tex)) {
+            if (partId.equals(PlayerBodyParts.LEFT_ARM) || partId.equals(PlayerBodyParts.RIGHT_ARM)) {
+                // Arms: draw two stacked bone images to reduce vertical stretching
+                int topH = h / 2;
+                int bottomH = h - topH; // handle odd heights
+                if (broken) {
+                    // Use stored half selection for broken overlay on arms
+                    Boolean topBroken = p.getBrokenTopHalf();
+                    if (topBroken == null) topBroken = Boolean.TRUE; // default if unset
+                    Identifier brokenTex = TEX_BONEMAIN_BROKEN;
+                    Identifier normalTex = TEX_BONEMAIN;
+                    if (topBroken) {
+                        ctx.drawTexture(brokenTex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
+                        ctx.drawTexture(normalTex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
+                    } else {
+                        ctx.drawTexture(normalTex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
+                        ctx.drawTexture(brokenTex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
+                    }
+                } else {
+                    ctx.drawTexture(tex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
+                    ctx.drawTexture(tex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
+                }
+            } else {
+                // Other parts: stretch single bone texture to destination size without tiling
+                ctx.drawTexture(tex, x, y, w, h, 0.0F, 0.0F, 16, 16, 16, 16);
+            }
+        } else {
+            // Visible placeholder if texture not present: draw a white 1px border
+            final int white = 0xFFFFFFFF;
+            ctx.fill(x, y, x + w, y + 1, white);
+            ctx.fill(x, y + h - 1, x + w, y + h, white);
+            ctx.fill(x, y, x + 1, y + h, white);
+            ctx.fill(x + w - 1, y, x + w, y + h, white);
+        }
+
+    }
+
+    private static boolean isDrawableResource(Identifier id) {
+        var rm = MinecraftClient.getInstance().getResourceManager();
+        try {
+            var opt = rm.getResource(id);
+            if (opt.isEmpty()) return false;
+            try (var is = opt.get().getInputStream()) {
+                return is.read() != -1;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static Identifier selectBoneTexture(net.minecraft.util.Identifier partId, boolean broken) {
+        if (partId.equals(PlayerBodyParts.HEAD)) {
+            // Skull is exempt from broken overlay
+            return TEX_SKULL;
+        } else if (partId.equals(PlayerBodyParts.TORSO)) {
+            return broken ? TEX_RIBCAGE_BROKEN : TEX_RIBCAGE;
+        } else if (partId.equals(PlayerBodyParts.LEFT_FOOT) || partId.equals(PlayerBodyParts.RIGHT_FOOT)) {
+            return broken ? TEX_FOOT_BROKEN : TEX_FOOT;
+        } else {
+            // Arms and legs share the same generic bone graphic
+            return broken ? TEX_BONEMAIN_BROKEN : TEX_BONEMAIN;
+        }
     }
 
     private static String formatHealth(BodyPart p) {

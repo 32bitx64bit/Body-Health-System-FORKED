@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "sis",
+    "sms",
+    "pdp"
+  ],
+  "key": {
+    "i": { "item": "minecraft:iron_nugget" },
+    "m": { "item": "bodyhealthsystem:medkit" },
+    "s": { "item": "minecraft:stick" },
+    "p": { "item": "bodyhealthsystem:plaster" },
+    "d": { "item": "bodyhealthsystem:dressing" }
+  },
+  "result": {
+    "item": "bodyhealthsystem:medkit_upgraded",
+    "count": 1
+  }
+}

@@ -12,6 +12,9 @@ import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 public abstract class BodyPart {
     private float maxHealth;
     private float health;
+    private boolean broken = false;
+    // For arms: whether the broken overlay should be on the top half (true) or bottom half (false)
+    private Boolean brokenTopHalf = null;
 
     protected float criticalThreshold;
     private LivingEntity entity;
@@ -104,11 +107,23 @@ public abstract class BodyPart {
     public void writeToNbt(NbtCompound nbt){
         NbtCompound new_nbt = new NbtCompound();
         new_nbt.putFloat("health", health);
+        new_nbt.putBoolean("broken", broken);
+        if (brokenTopHalf != null) new_nbt.putBoolean("brokenTopHalf", brokenTopHalf);
         nbt.put(identifier.toString(), new_nbt);
     }
 
     public void readFromNbt(NbtCompound nbt){
         health = nbt.getFloat("health");
+        if (nbt.contains("broken")) {
+            broken = nbt.getBoolean("broken");
+        } else {
+            broken = false;
+        }
+        if (nbt.contains("brokenTopHalf")) {
+            brokenTopHalf = nbt.getBoolean("brokenTopHalf");
+        } else {
+            brokenTopHalf = null;
+        }
     }
 
     @Override
@@ -118,5 +133,21 @@ public abstract class BodyPart {
 
     public boolean isDamaged() {
         return health < maxHealth;
+    }
+
+    public boolean isBroken() {
+        return broken;
+    }
+
+    public void setBroken(boolean broken) {
+        this.broken = broken;
+    }
+
+    public Boolean getBrokenTopHalf() {
+        return brokenTopHalf;
+    }
+
+    public void setBrokenTopHalf(Boolean brokenTopHalf) {
+        this.brokenTopHalf = brokenTopHalf;
     }
 }
