@@ -17,7 +17,7 @@ import net.minecraft.util.hit.HitResult;
 
 @Mixin(PersistentProjectileEntity.class)
 public class ProjectileHitMixin {
-    private static final double ARM_X_THRESHOLD = 0.85; 
+    private static final double ARM_X_THRESHOLD = 0.80; 
 
     @Inject(method = "onEntityHit", at = @At("HEAD"))
     private void bhs$recordHit(EntityHitResult entityHitResult, CallbackInfo ci) {
@@ -78,12 +78,10 @@ public class ProjectileHitMixin {
         String side = "";
         if (xNorm < -0.25) side = "Right ";
         else if (xNorm > 0.25) side = "Left ";
-
-        if (yNorm < 0.15) return side + "Foot";
-        if (yNorm < 0.45) return side + "Leg";
-        if (yNorm < 0.75) {
-            // Arms only in the upper torso band, narrower and further out
-            if (yNorm >= 0.55 && Math.abs(xNorm) > ARM_X_THRESHOLD) return side + "Arm";
+        if (yNorm < 0.18) return side + "Foot";
+        if (yNorm < 0.50) return side + "Leg";
+        if (yNorm < 0.88) {
+            if (yNorm >= 0.60 && Math.abs(xNorm) > ARM_X_THRESHOLD) return side + "Arm";
             return "Torso";
         }
         return side + "Head";
