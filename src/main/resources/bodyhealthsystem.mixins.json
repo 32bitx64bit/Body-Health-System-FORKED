@@ -14,7 +14,9 @@
     "NoHeartsMixin",
     "OnTryUseTotemMixin",
     "CrawlEyeHeightMixin",
-    "ProjectileHitMixin"
+    "ProjectileHitMixin",
+    "PreventJumpWhenDownedMixin",
+    "OnDeathMixin"
   ],
   "client": [
     "InventoryScreenHudMixin",

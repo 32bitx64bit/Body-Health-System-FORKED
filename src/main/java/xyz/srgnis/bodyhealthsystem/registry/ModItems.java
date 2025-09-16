@@ -15,6 +15,7 @@ import xyz.srgnis.bodyhealthsystem.items.DressingItem;
 import xyz.srgnis.bodyhealthsystem.items.AnkleBraceItem;
 import xyz.srgnis.bodyhealthsystem.items.ChestBraceItem;
 import xyz.srgnis.bodyhealthsystem.items.UpgradedMedkitItem;
+import xyz.srgnis.bodyhealthsystem.items.TraumaKitItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -25,6 +26,7 @@ public class ModItems {
     public static final Item ANKLE_BRACE_ITEM = new AnkleBraceItem(new FabricItemSettings());
     public static final Item CHEST_BRACE_ITEM = new ChestBraceItem(new FabricItemSettings());
     public static final Item UPGRADED_MEDKIT_ITEM = new UpgradedMedkitItem(new FabricItemSettings());
+    public static final Item TRAUMA_KIT_ITEM = new TraumaKitItem(new FabricItemSettings());
 
     public static void registerItems(){
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "plaster"), PLASTER_ITEM);
@@ -35,6 +37,7 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"ankle_brace"), ANKLE_BRACE_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"chest_brace"), CHEST_BRACE_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"medkit_upgraded"), UPGRADED_MEDKIT_ITEM);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"trauma_kit"), TRAUMA_KIT_ITEM);
 
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(PLASTER_ITEM);
@@ -59,6 +62,9 @@ public class ModItems {
         });
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(UPGRADED_MEDKIT_ITEM);
+        });
+        ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
+            content.add(TRAUMA_KIT_ITEM);
         });
     }
 }

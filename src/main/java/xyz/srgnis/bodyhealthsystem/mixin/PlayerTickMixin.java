@@ -20,6 +20,50 @@ public class PlayerTickMixin {
     public void onTick(CallbackInfo ci){
         PlayerEntity player = (PlayerEntity) (Object) this;
         Body body = ((BodyProvider)player).getBody();
+
+        // Server-side safety: if player is at/below 0 HP but head is intact, force downed instead of death
+        if (!player.getWorld().isClient) {
+            // If a forced death is pending, ensure it completes and skip other logic
+            if (body.isPendingDeath()) {
+                if (player.isAlive()) {
+                    player.damage(player.getDamageSources().outOfWorld(), 1000.0f);
+                }
+                return;
+            }
+
+            BodyPart head = body.getPart(PlayerBodyParts.HEAD);
+            // Only do safety if the player is alive and we are not forcing a death
+            if (player.isAlive()) {
+                if (player.getHealth() <= 0.0f && head != null && head.getHealth() > 0.0f && !body.isDowned()) {
+                    body.startDowned();
+                    player.setHealth(1.0f);
+                }
+            }
+            body.tickDowned();
+        }
+        if (body.isDowned()) {
+            // Hard immobilize: extreme slowness and mining fatigue, prevent sprinting and jumping
+            player.setSprinting(false);
+            player.removeStatusEffect(StatusEffects.SLOWNESS);
+            player.removeStatusEffect(StatusEffects.MINING_FATIGUE);
+            player.removeStatusEffect(StatusEffects.WEAKNESS);
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 255, false, false));
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 255, false, false));
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 2, false, false));
+
+            // Downed pose: use SWIMMING for a reliable prone/lying visual without a bed
+            player.setPose(EntityPose.SWIMMING);
+            player.setSwimming(false);
+
+            // Nudge velocity towards zero on server and kill vertical motion to prevent jump "hops"
+            if (!player.getWorld().isClient) {
+                player.setVelocity(0.0, 0.0, 0.0);
+                player.velocityDirty = true;
+                player.setSneaking(false);
+            }
+            return;
+        }
+
         // Replace damage-based effects with bone-based system
         body.applyBrokenBonesEffects();
 
@@ -54,6 +98,11 @@ public class PlayerTickMixin {
             }
         } else {
             // Restore normal pose if not required to crawl and currently in crawling pose
+            if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
+                player.setSwimming(false);
+                player.setPose(EntityPose.STANDING);
+            }
+            // If we were previously using the prone pose for downed, restore standing when no longer downed
             if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
                 player.setSwimming(false);
                 player.setPose(EntityPose.STANDING);

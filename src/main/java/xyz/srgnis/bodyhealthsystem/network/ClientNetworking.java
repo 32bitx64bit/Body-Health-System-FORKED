@@ -26,41 +26,70 @@ public class ClientNetworking {
 
     private static void updateEntity(MinecraftClient client, ClientPlayNetworkHandler clientPlayNetworkHandler, PacketByteBuf buf, PacketSender packetSender) {
         Entity entity = client.player.getWorld().getEntityById(buf.readInt());
+        // Read all parts first; remaining payload contains downed sync
         while (buf.isReadable()) {
-            Identifier id = buf.readIdentifier();
-            float health = buf.readFloat();
-            float maxhealth = buf.readFloat();
-            boolean broken = buf.readBoolean();
-            boolean hasHalf = buf.readBoolean();
-            boolean topHalf = hasHalf && buf.readBoolean();
-
-            //TODO: Add config sync at join and remove setMaxHealth on ClientNetworking.handleHealthChange
+            // Peek: if next is boolean and not an Identifier, break to read state
+            int readerIndex = buf.readerIndex();
+            try {
+                Identifier idf = buf.readIdentifier();
+                float health = buf.readFloat();
+                float maxhealth = buf.readFloat();
+                boolean broken = buf.readBoolean();
+                boolean hasHalf = buf.readBoolean();
+                boolean topHalf = hasHalf && buf.readBoolean();
+                client.execute(() -> {
+                    var part = ((BodyProvider) entity).getBody().getPart(idf);
+                    part.setMaxHealth(maxhealth);
+                    part.setHealth(health);
+                    part.setBroken(broken);
+                    part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                });
+            } catch (Exception ex) {
+                buf.readerIndex(readerIndex);
+                break;
+            }
+        }
+        if (buf.isReadable()) {
+            boolean downed = buf.readBoolean();
+            int bleed = buf.readInt();
             client.execute(() -> {
-                var part = ((BodyProvider) entity).getBody().getPart(id);
-                part.setMaxHealth(maxhealth);
-                part.setHealth(health);
-                part.setBroken(broken);
-                part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                var body = ((BodyProvider) entity).getBody();
+                body.setDowned(downed);
+                body.setBleedOutTicksRemaining(bleed);
             });
         }
     }
 
     public static void handleHealthChange(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender sender){
+        // Read all parts; remaining payload contains optional downed sync
         while (buf.isReadable()) {
-            Identifier id = buf.readIdentifier();
-            float health = buf.readFloat();
-            float maxhealth = buf.readFloat();
-            boolean broken = buf.readBoolean();
-            boolean hasHalf = buf.readBoolean();
-            boolean topHalf = hasHalf && buf.readBoolean();
-
-            //TODO: Add config sync at join and remove setMaxHealth on ClientNetworking.handleHealthChange
+            int readerIndex = buf.readerIndex();
+            try {
+                Identifier idf = buf.readIdentifier();
+                float health = buf.readFloat();
+                float maxhealth = buf.readFloat();
+                boolean broken = buf.readBoolean();
+                boolean hasHalf = buf.readBoolean();
+                boolean topHalf = hasHalf && buf.readBoolean();
+                client.execute(() -> {
+                    var part = ((BodyProvider) client.player).getBody().getPart(idf);
+                    part.setMaxHealth(maxhealth);
+                    part.setHealth(health);
+                    part.setBroken(broken);
+                    part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                });
+            } catch (Exception ex) {
+                buf.readerIndex(readerIndex);
+                break;
+            }
+        }
+        if (buf.isReadable()) {
+            boolean downed = buf.readBoolean();
+            int bleed = buf.readInt();
             client.execute(() -> {
-                var part = ((BodyProvider) client.player).getBody().getPart(id);
-                part.setMaxHealth(maxhealth);
-                part.setHealth(health);
-                part.setBroken(broken);
-                part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                var body = ((BodyProvider) client.player).getBody();
+                body.setDowned(downed);
+                body.setBleedOutTicksRemaining(bleed);
             });
         }
     }

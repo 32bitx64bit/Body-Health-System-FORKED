@@ -25,12 +25,28 @@ public class OnApplyDamage {
             return amount;
         }
         if (!((PlayerEntity) (Object)this).isInvulnerableTo(source)) {
+            PlayerEntity player = (PlayerEntity)(Object)this;
             Body body = ((BodyProvider)this).getBody();
             body.applyDamageBySource(amount, source);
             body.updateHealth();
 
+            // If this hit would kill the player but head is still intact, enter downed and cancel vanilla subtraction
+            var head = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+            float predicted = player.getHealth() - amount;
+            if (head != null && head.getHealth() > 0.0f && predicted <= 0.0f) {
+                body.startDowned();
+                player.setHealth(1.0f);
+                ServerNetworking.syncBody(player);
+                return 0.0f;
+            }
+
+            // If player entered or is in downed state, prevent vanilla health subtraction this hit
+            if (body.isDowned()) {
+                ServerNetworking.syncBody(player);
+                return 0.0f;
+            }
+
             // Apply adrenaline based on incoming damage (server-side only)
-            PlayerEntity player = (PlayerEntity)(Object)this;
             if (!player.getWorld().isClient && amount > 0) {
                 int durationTicks = (int)(amount * Config.adrenalineSecondsPerDamage * 10.0f);
                 int cap = Math.max(0, Config.adrenalineMaxSeconds * 15);
@@ -47,7 +63,7 @@ public class OnApplyDamage {
                 }
             }
 
-            ServerNetworking.syncBody((PlayerEntity)(Object)this);
+            ServerNetworking.syncBody(player);
         }
         // Return the original amount to allow proper health reduction
         return amount;

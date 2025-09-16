@@ -30,6 +30,13 @@ public abstract class Body {
     protected boolean bonePenaltyActive = false; // once grace hits 0, periodic health loss active
     protected int bonePenaltyTickCounter = 0; // counts to 10s windows
 
+    // Downed / revival state (server authoritative, not persisted)
+    protected boolean downed = false;
+    protected int bleedOutTicksRemaining = 0;
+    protected boolean beingRevived = false;
+    protected java.util.UUID reviverUuid = null;
+    protected boolean pendingDeath = false; // when true, a vanilla death is being forced
+
     public abstract void initParts();
 
     public void addPart(Identifier identifier, BodyPart part){
@@ -325,8 +332,10 @@ public abstract class Body {
                     float damage = 0.5f * stacks;
                     float newHealth = player.getHealth() - damage;
                     player.setHealth(Math.max(0.0f, newHealth));
-                    if (player.getHealth() <= 0.0f) {
-                        player.onDeath(player.getDamageSources().generic());
+                    if (player.getHealth() <= 0.0f && player.isAlive()) {
+                        // Use outOfWorld damage to ensure a clean vanilla death
+                        pendingDeath = true;
+                        player.damage(player.getDamageSources().outOfWorld(), 1000.0f);
                     }
                 }
             }
@@ -354,30 +363,47 @@ public abstract class Body {
     }
 
     public void updateHealth(){
+        // Special lethal rule: if head is destroyed, die immediately (no downed state)
+        BodyPart head = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+        BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+        if (head != null && head.getHealth() <= 0.0f) {
+            entity.setHealth(0);
+            return;
+        }
+
+        // If torso is destroyed, enter/maintain downed state instead of dying
+        if (torso != null && torso.getHealth() <= 0.0f) {
+            startDowned();
+            // Keep player barely alive while downed to allow revival
+            if (entity.getHealth() < 1.0f) {
+                entity.setHealth(1.0f);
+            }
+            return;
+        }
+
+        // Normal proportional health mapping, with downed threshold fallback
         float max_health = 0;
         float actual_health = 0;
-        boolean shouldDie = false;
         for( BodyPart part : this.getParts()){
             max_health += part.getMaxHealth();
             actual_health += part.getHealth();
-            if(part.isKillRequirement && part.getHealth() <= 0){
-                shouldDie = true;
-            }
         }
-        if (shouldDie){
-            entity.setHealth(0);
-        }else {
-            entity.setHealth(entity.getMaxHealth() * ( actual_health / max_health ));
+        if (max_health > 0) {
+            float ratio = actual_health / max_health;
+            // If overall health is extremely low, enter downed state (head intact)
+            if (ratio <= 0.01f) {
+                startDowned();
+                if (entity.getHealth() > 1.0f) entity.setHealth(1.0f);
+                return;
+            }
+            entity.setHealth(entity.getMaxHealth() * ratio);
         }
     }
 
     public boolean shouldDie(){
-        for( BodyPart part : this.getParts()){
-            if(part.isKillRequirement && part.getHealth() <= 0){
-                return true;
-            }
-        }
-        return false;
+        // Only the head being destroyed should cause immediate death; torso destruction leads to downed state
+        BodyPart head = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+        return head != null && head.getHealth() <= 0.0f;
     }
 
 
@@ -444,6 +470,114 @@ public abstract class Body {
     protected boolean isTorsoBroken() {
         BodyPart t = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
         return t != null && t.isBroken();
+    }
+
+    // Downed / revival helpers
+    public boolean isDowned() { return downed; }
+    public boolean isBeingRevived() { return beingRevived; }
+    // Client/server sync helpers
+    public void setDowned(boolean downed) { this.downed = downed; }
+    public void setBeingRevived(boolean beingRevived) { this.beingRevived = beingRevived; }
+    public int getBleedOutTicksRemaining() { return bleedOutTicksRemaining; }
+    public void setBleedOutTicksRemaining(int ticks) { this.bleedOutTicksRemaining = ticks; }
+
+    public boolean tryBeginRevive(net.minecraft.entity.player.PlayerEntity reviver) {
+        if (!downed) return false;
+        if (beingRevived) {
+            return reviverUuid != null && reviverUuid.equals(reviver.getUuid());
+        }
+        beingRevived = true;
+        reviverUuid = reviver.getUuid();
+        return true;
+    }
+
+    public void endRevive(net.minecraft.entity.player.PlayerEntity reviver) {
+        if (reviverUuid != null && reviverUuid.equals(reviver.getUuid())) {
+            beingRevived = false;
+            reviverUuid = null;
+        }
+    }
+
+    public void startDowned() {
+        if (downed) return;
+        downed = true;
+        // Bleed-out time: 80s normally, 40s if torso bone is broken
+        bleedOutTicksRemaining = isTorsoBroken() ? (40 * 20) : (80 * 20);
+    }
+
+    public void clearDowned() {
+        downed = false;
+        beingRevived = false;
+        reviverUuid = null;
+        bleedOutTicksRemaining = 0;
+    }
+
+    public boolean isPendingDeath() { return pendingDeath; }
+
+    public void onVanillaDeath() {
+        clearDowned();
+        pendingDeath = false;
+    }
+
+    public void tickDowned() {
+        if (!downed) return;
+        if (entity.getWorld().isClient) return;
+        if (!beingRevived) {
+            if (bleedOutTicksRemaining > 0) {
+                bleedOutTicksRemaining--;
+            }
+            if (bleedOutTicksRemaining <= 0) {
+                // Bleed out - ensure a proper vanilla death path that supports respawn
+                if (entity.isAlive()) {
+                    pendingDeath = true;
+                    entity.damage(entity.getDamageSources().outOfWorld(), 1000.0f);
+                }
+                clearDowned();
+            }
+        }
+    }
+
+    public void applyRevival(int healPerPart, int bonesToFix) {
+        if (!downed) return;
+        // Heal all damaged body parts by healPerPart
+        for (BodyPart p : getParts()) {
+            if (p.getHealth() < p.getMaxHealth()) {
+                p.setHealth(Math.min(p.getMaxHealth(), p.getHealth() + healPerPart));
+            }
+        }
+        // Fix bones, preferring torso first (never head)
+        fixBrokenBonesPreferTorso(bonesToFix);
+        // Clear downed and update overall health
+        clearDowned();
+        pendingDeath = false;
+        updateHealth();
+    }
+
+    private void fixBrokenBonesPreferTorso(int count) {
+        if (count <= 0) return;
+        java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
+        BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+        // If torso is broken, fix it first
+        if (torso != null && torso.isBroken()) {
+            torso.setBroken(false);
+            torso.setBrokenTopHalf(null);
+            if (torso.getHealth() <= 0.0f) torso.setHealth(1.0f);
+            count--;
+        }
+        if (count <= 0) return;
+        // Gather other broken bones except head
+        for (BodyPart p : getParts()) {
+            if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
+            if (p.isBroken()) candidates.add(p);
+        }
+        java.util.Collections.shuffle(candidates, new java.util.Random());
+        for (BodyPart p : candidates) {
+            if (count <= 0) break;
+            p.setBroken(false);
+            p.setBrokenTopHalf(null);
+            if (p.getHealth() <= 0.0f) p.setHealth(1.0f);
+            count--;
+        }
     }
 
     protected boolean anyBoneBroken() {

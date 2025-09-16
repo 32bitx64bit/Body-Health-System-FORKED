@@ -38,6 +38,7 @@ import xyz.srgnis.bodyhealthsystem.client.screen.HealScreenHandler;
 
 //FIXME: null pointers
 public class MedkitItem extends Item {
+	private static final String TARGET_NBT = "MedkitTargetId";
 	public MedkitItem(Settings settings) {
 		super(settings);
 	}
@@ -51,10 +52,82 @@ public class MedkitItem extends Item {
 
 	@Override
 	public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
-		if(entity instanceof BodyProvider){
+		if(entity instanceof BodyProvider bp){
+			var body = bp.getBody();
+			// If target is downed, start revival channel instead of opening UI
+			if (body.isDowned()) {
+				// Only allow one reviver
+				if (!body.tryBeginRevive(user)) {
+					return ActionResult.FAIL;
+				}
+				// Bind target id into item NBT for finish/cancel
+				var tag = stack.getOrCreateNbt();
+				tag.putInt(TARGET_NBT, entity.getId());
+				// Use vanilla use-duration channeling
+				user.setCurrentHand(hand);
+				return ActionResult.CONSUME;
+			}
 			user.openHandledScreen(createScreenHandlerFactory(stack, entity));
+			return ActionResult.CONSUME;
 		}
-		return ActionResult.CONSUME;
+		return ActionResult.PASS;
+	}
+
+
+	@Override
+	public int getMaxUseTime(ItemStack stack) {
+		return 8 * 20; // 8 seconds
+	}
+
+	@Override
+	public net.minecraft.util.UseAction getUseAction(ItemStack stack) {
+		return net.minecraft.util.UseAction.BRUSH;
+	}
+
+	@Override
+	public void onStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks) {
+		if (!world.isClient && user instanceof PlayerEntity pe) {
+			var tag = stack.getNbt();
+			if (tag != null && tag.contains(TARGET_NBT)) {
+				var e = world.getEntityById(tag.getInt(TARGET_NBT));
+				if (e instanceof LivingEntity le && le instanceof BodyProvider) {
+					((BodyProvider) le).getBody().endRevive(pe);
+				}
+				tag.remove(TARGET_NBT);
+				if (tag.isEmpty()) stack.setNbt(null);
+			}
+		}
+	}
+
+	@Override
+	public ItemStack finishUsing(ItemStack stack, World world, LivingEntity user) {
+		if (!world.isClient && user instanceof PlayerEntity pe) {
+			var tag = stack.getNbt();
+			LivingEntity target = null;
+			if (tag != null && tag.contains(TARGET_NBT)) {
+				var e = world.getEntityById(tag.getInt(TARGET_NBT));
+				if (e instanceof LivingEntity) target = (LivingEntity) e;
+				tag.remove(TARGET_NBT);
+				if (tag.isEmpty()) stack.setNbt(null);
+			}
+			if (target instanceof BodyProvider) {
+				var body = ((BodyProvider) target).getBody();
+				body.endRevive(pe);
+				// Eligibility: head not destroyed; if torso destroyed, not allowed for base medkit
+				var head = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+				var torso = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+				if (head != null && head.getHealth() <= 0.0f) return stack;
+				if (torso != null && torso.getHealth() <= 0.0f) return stack;
+				if (body.isDowned()) {
+					body.applyRevival(1, 0);
+					if (target instanceof PlayerEntity) {
+						xyz.srgnis.bodyhealthsystem.network.ServerNetworking.syncBody((PlayerEntity) target);
+					}
+					stack.decrement(1);
+				}
+			}
+		}
+		return stack;
 	}
 
 	private ExtendedScreenHandlerFactory createScreenHandlerFactory(ItemStack stack, LivingEntity entity) {

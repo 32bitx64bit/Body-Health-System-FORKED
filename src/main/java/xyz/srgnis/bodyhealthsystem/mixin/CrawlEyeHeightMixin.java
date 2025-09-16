@@ -19,6 +19,11 @@ public class CrawlEyeHeightMixin {
         if (!(player instanceof BodyProvider)) return;
         PlayerBody body = (PlayerBody)((BodyProvider) player).getBody();
         if (body == null) return;
+        // Downed: force low eye height so camera matches a prone body
+        if (body.isDowned()) {
+            cir.setReturnValue(0.4f);
+            return;
+        }
         if (body.isCrawlingRequired()) {
             // Force a low eye height similar to swimming/crawling
             cir.setReturnValue(0.4f);

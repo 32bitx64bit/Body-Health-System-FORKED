@@ -40,7 +40,8 @@ public class ServerNetworking {
 
         buf.writeInt(entity.getId());
 
-        for (BodyPart part : ((BodyProvider)entity).getBody().getParts()) {
+        var body = ((BodyProvider)entity).getBody();
+        for (BodyPart part : body.getParts()) {
             buf.writeIdentifier(part.getIdentifier());
             buf.writeFloat(part.getHealth());
             buf.writeFloat(part.getMaxHealth());
@@ -50,7 +51,10 @@ public class ServerNetworking {
             buf.writeBoolean(hasHalf);
             if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
         }
-        //Handled by ClientNetworking.handleHealthChange
+        // Downed sync (server authoritative)
+        buf.writeBoolean(body.isDowned());
+        buf.writeInt(body.getBleedOutTicksRemaining());
+        //Handled by ClientNetworking.updateEntity
         ServerPlayNetworking.send(player, id("data_request"), buf);
     }
 
@@ -114,7 +118,8 @@ public class ServerNetworking {
     public static void syncBody(PlayerEntity pe){
         PacketByteBuf buf = PacketByteBufs.create();
 
-        for (BodyPart part : ((BodyProvider)pe).getBody().getParts()) {
+        var body = ((BodyProvider)pe).getBody();
+        for (BodyPart part : body.getParts()) {
             buf.writeIdentifier(part.getIdentifier());
             buf.writeFloat(part.getHealth());
             buf.writeFloat(part.getMaxHealth());
@@ -124,6 +129,9 @@ public class ServerNetworking {
             buf.writeBoolean(hasHalf);
             if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
         }
+        // Also include downed state on player self-sync
+        buf.writeBoolean(body.isDowned());
+        buf.writeInt(body.getBleedOutTicksRemaining());
         //Handled by ClientNetworking.handleHealthChange
         ServerPlayNetworking.send( (ServerPlayerEntity) pe, BHSMain.MOD_IDENTIFIER, buf);
     }
