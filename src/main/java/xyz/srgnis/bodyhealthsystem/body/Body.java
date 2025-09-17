@@ -29,6 +29,7 @@ public abstract class Body {
     protected int boneGraceTicksRemaining = 0; // counts down after a break
     protected boolean bonePenaltyActive = false; // once grace hits 0, periodic health loss active
     protected int bonePenaltyTickCounter = 0; // counts to 10s windows
+    protected float pendingHealthShock = 0.0f; // applied after updateHealth mapping
 
     // Downed / revival state (server authoritative, not persisted)
     protected boolean downed = false;
@@ -410,6 +411,18 @@ public abstract class Body {
                 return;
             }
             entity.setHealth(entity.getMaxHealth() * ratio);
+            // Apply any pending shock from recent bone breaks after mapping
+            if (pendingHealthShock > 0.0f) {
+                float newHp = Math.max(0.0f, entity.getHealth() - pendingHealthShock);
+                entity.setHealth(newHp);
+                pendingHealthShock = 0.0f;
+                // If shock would have killed the player but head is intact, go downed instead
+                BodyPart head2 = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+                if (newHp <= 0.0f && head2 != null && head2.getHealth() > 0.0f) {
+                    startDowned();
+                    entity.setHealth(1.0f);
+                }
+            }
         }
     }
 
@@ -439,12 +452,16 @@ public abstract class Body {
     public void onBoneBrokenEvent(BodyPart part) {
         // Start or accelerate the grace timer
         if (boneGraceTicksRemaining <= 0 && !bonePenaltyActive) {
-            boneGraceTicksRemaining = 2400; // 2 minutes at 20 tps        } else {
+            // 2 minutes at 20 tps
+            boneGraceTicksRemaining = 2400;
+        } else {
             // subtract 600 ticks, clamp at 0
             boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining - 600);
         }
-        // Apply a one-time 5s blindness when a bone breaks
         if (entity instanceof net.minecraft.entity.player.PlayerEntity player && !entity.getWorld().isClient) {
+            // Queue a small health shock; it will be applied after updateHealth mapping
+            pendingHealthShock += 2.0f; // 2 HP = 1 heart
+            // Apply a one-time 5s blindness when a bone breaks
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
                     net.minecraft.entity.effect.StatusEffects.BLINDNESS, 100, 0, false, false));
         }
