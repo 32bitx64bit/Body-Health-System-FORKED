@@ -27,6 +27,9 @@ public abstract class Body {
     protected HashMap<Identifier, BodyPart> noCriticalParts = new HashMap<>();
     protected LivingEntity entity;
 
+    // When true, skip bone-break evaluation for the current damage application
+    protected boolean suppressBoneBreakEvaluation = false;
+
     // Bone system timers (server authoritative, not persisted)
     protected int boneGraceTicksRemaining = 0; // counts down after a break
     protected boolean bonePenaltyActive = false; // once grace hits 0, periodic health loss active
@@ -215,7 +218,7 @@ public abstract class Body {
         }
 
         // After damage is applied, evaluate bone break chance (except skull)
-        if (!part.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) {
+        if (!part.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && !suppressBoneBreakEvaluation) {
             evaluateBoneBreak(part, previousHealth, amount);
         }
 
@@ -391,7 +394,7 @@ public abstract class Body {
                             // Shouldn't happen due to selection, but guard anyway
                             if (!aliveNonHeadNonTorso.isEmpty()) {
                                 BodyPart reroute = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
-                                takeDamage(dmg, player.getDamageSources().generic(), reroute);
+                                applyBleedingDamageTo(player, reroute, dmg);
                             }
                         } else if (target == torso && torso != null && !othersDestroyed && torso.getHealth() > 2.0f) {
                             // Clamp torso damage so it never drops below 2 HP while others are not destroyed
@@ -399,15 +402,15 @@ public abstract class Body {
                             float toTorso = Math.min(dmg, allowed);
                             float remainder = dmg - toTorso;
                             if (toTorso > 0.0f) {
-                                takeDamage(toTorso, player.getDamageSources().generic(), torso);
+                                applyBleedingDamageTo(player, torso, toTorso);
                             }
                             if (remainder > 0.0f && !aliveNonHeadNonTorso.isEmpty()) {
                                 BodyPart reroute = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
-                                takeDamage(remainder, player.getDamageSources().generic(), reroute);
+                                applyBleedingDamageTo(player, reroute, remainder);
                             }
                         } else {
                             // Normal application
-                            takeDamage(dmg, player.getDamageSources().generic(), target);
+                            applyBleedingDamageTo(player, target, dmg);
                         }
                         updateHealth();
                         // Sync to clients so their HUD reflects the tick damage
@@ -415,6 +418,16 @@ public abstract class Body {
                     }
                 }
             }
+        }
+    }
+
+    private void applyBleedingDamageTo(net.minecraft.entity.player.PlayerEntity player, BodyPart target, float amount) {
+        if (target == null || amount <= 0.0f) return;
+        suppressBoneBreakEvaluation = true;
+        try {
+            takeDamage(amount, player.getDamageSources().generic(), target);
+        } finally {
+            suppressBoneBreakEvaluation = false;
         }
     }
 
