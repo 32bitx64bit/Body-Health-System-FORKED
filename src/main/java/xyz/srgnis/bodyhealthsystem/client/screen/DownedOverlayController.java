@@ -2,6 +2,7 @@ package xyz.srgnis.bodyhealthsystem.client.screen;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.DeathScreen;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 
 public final class DownedOverlayController {
@@ -13,7 +14,17 @@ public final class DownedOverlayController {
     public static void initClient() {
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.player == null) return;
+
+            // If player is dead, ensure overlay closes and reset state.
+            if (mc.player == null || !mc.player.isAlive() || mc.currentScreen instanceof DeathScreen) {
+                if (mc.currentScreen instanceof DownedGiveUpScreen) {
+                    mc.setScreen(null);
+                }
+                wasDowned = false;
+                suppressOverlay = false;
+                return;
+            }
+
             if (!(mc.player instanceof BodyProvider provider)) return;
             var body = provider.getBody();
             if (body == null) return;
