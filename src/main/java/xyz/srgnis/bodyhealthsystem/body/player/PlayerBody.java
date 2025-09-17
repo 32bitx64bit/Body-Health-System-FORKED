@@ -135,7 +135,7 @@ public class PlayerBody extends Body {
                 : part.damage(amount);
 
         // Evaluate bone break state (skull exempt). Delegate to base for consistency.
-        if (!part.getIdentifier().equals(HEAD)) {
+        if (!part.getIdentifier().equals(HEAD) && !suppressBoneBreakEvaluation) {
             // We call the base helper by mimicking Body.takeDamage flow where it runs evaluateBoneBreak
             // Here we just reproduce the call and event to avoid duplication issues.
             float max = part.getMaxHealth();
