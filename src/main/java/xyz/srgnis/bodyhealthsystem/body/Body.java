@@ -532,6 +532,16 @@ public abstract class Body {
         pendingDeath = false;
     }
 
+    // Force a give up -> immediate vanilla death pathway
+    public void forceGiveUp() {
+        if (entity == null || entity.getWorld().isClient) return;
+        if (!downed) return;
+        pendingDeath = true;
+        if (entity.isAlive()) {
+            entity.damage(entity.getDamageSources().outOfWorld(), 1000.0f);
+        }
+    }
+
     public void tickDowned() {
         if (!downed) return;
         if (entity.getWorld().isClient) return;

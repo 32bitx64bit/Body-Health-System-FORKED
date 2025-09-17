@@ -37,6 +37,10 @@ public class UpgradedMedkitItem extends Item {
             var body = bp.getBody();
             if (body.isDowned()) {
                 if (!body.tryBeginRevive(user)) return ActionResult.FAIL;
+                // Inform all clients that revival has started (pauses timer UI)
+                if (!user.getWorld().isClient) {
+                    xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(entity);
+                }
                 var tag = stack.getOrCreateNbt();
                 tag.putInt(TARGET_NBT, entity.getId());
                 user.setCurrentHand(hand);
@@ -66,6 +70,8 @@ public class UpgradedMedkitItem extends Item {
                 var e = world.getEntityById(tag.getInt(TARGET_NBT));
                 if (e instanceof LivingEntity le && le instanceof BodyProvider) {
                     ((BodyProvider) le).getBody().endRevive(pe);
+                    // Notify all clients that revival has stopped
+                    xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(le);
                 }
                 tag.remove(TARGET_NBT);
                 if (tag.isEmpty()) stack.setNbt(null);

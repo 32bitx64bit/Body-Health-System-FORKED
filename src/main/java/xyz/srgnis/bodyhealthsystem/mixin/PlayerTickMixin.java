@@ -13,6 +13,7 @@ import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts;
 import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
+import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 
 @Mixin(PlayerEntity.class)
 public class PlayerTickMixin {
@@ -37,9 +38,15 @@ public class PlayerTickMixin {
                 if (player.getHealth() <= 0.0f && head != null && head.getHealth() > 0.0f && !body.isDowned()) {
                     body.startDowned();
                     player.setHealth(1.0f);
+                    // Inform all clients immediately
+                    ServerNetworking.broadcastBody(player);
                 }
             }
             body.tickDowned();
+            // While downed, periodically sync timer/pose to clients (once per second)
+            if (body.isDowned() && (player.age % 20 == 0)) {
+                ServerNetworking.broadcastBody(player);
+            }
         }
         if (body.isDowned()) {
             // Hard immobilize: extreme slowness and mining fatigue, prevent sprinting and jumping
@@ -51,12 +58,15 @@ public class PlayerTickMixin {
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 255, false, false));
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 2, false, false));
 
-            // Downed pose: use SWIMMING for a reliable prone/lying visual without a bed
-            player.setPose(EntityPose.SWIMMING);
-            player.setSwimming(false);
-
-            // Nudge velocity towards zero on server and kill vertical motion to prevent jump "hops"
-            if (!player.getWorld().isClient) {
+            // Downed pose handled client-side to avoid constant server pose churn
+            if (player.getWorld().isClient) {
+                // Only adjust if needed, and not every tick to avoid flicker
+                if ((player.age % 4 == 0) && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
+                    player.setSwimming(true);
+                    player.setPose(EntityPose.SWIMMING);
+                }
+            } else {
+                // Server: stabilize motion only
                 player.setVelocity(0.0, 0.0, 0.0);
                 player.velocityDirty = true;
                 player.setSneaking(false);
@@ -77,9 +87,13 @@ public class PlayerTickMixin {
                 && leftFoot.getHealth() <= 0.0f && rightFoot.getHealth() <= 0.0f;
 
         if (legsAndFeetBroken) {
-            // Force crawling pose and ensure camera lowers
-            player.setPose(EntityPose.SWIMMING);
-            player.setSwimming(true);
+            // Force crawling pose (client only) and ensure camera lowers
+            if (player.getWorld().isClient) {
+                if ((player.age % 6 == 0) && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
+                    player.setSwimming(true);
+                    player.setPose(EntityPose.SWIMMING);
+                }
+            }
 
             boolean hasSuppression = player.getStatusEffect(ModStatusEffects.MORPHINE_EFFECT) != null
                     || player.getStatusEffect(ModStatusEffects.ADRENALINE_EFFECT) != null;
@@ -97,15 +111,15 @@ public class PlayerTickMixin {
                 player.removeStatusEffect(StatusEffects.SLOWNESS);
             }
         } else {
-            // Restore normal pose if not required to crawl and currently in crawling pose
-            if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
-                player.setSwimming(false);
-                player.setPose(EntityPose.STANDING);
-            }
-            // If we were previously using the prone pose for downed, restore standing when no longer downed
-            if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
-                player.setSwimming(false);
-                player.setPose(EntityPose.STANDING);
+            // Restore normal pose client-side if not required to crawl and currently in swimming pose while not in water
+            if (player.getWorld().isClient) {
+                if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
+                    // Only adjust occasionally to avoid flicker
+                    if (player.age % 6 == 0) {
+                        player.setSwimming(false);
+                        player.setPose(EntityPose.STANDING);
+                    }
+                }
             }
         }
     }

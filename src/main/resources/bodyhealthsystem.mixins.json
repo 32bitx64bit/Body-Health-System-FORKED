@@ -20,7 +20,8 @@
   ],
   "client": [
     "InventoryScreenHudMixin",
-    "HandledScreenAccessor"
+    "HandledScreenAccessor",
+    "BlockInventoryWhileDownedMixin"
   ],
   "injectors": {
     "defaultRequire": 1

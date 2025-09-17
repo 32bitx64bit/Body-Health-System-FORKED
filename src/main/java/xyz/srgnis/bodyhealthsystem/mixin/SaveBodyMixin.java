@@ -6,8 +6,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import net.minecraft.server.network.ServerPlayerEntity;
-import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 
 @Mixin(PlayerEntity.class)
@@ -23,11 +21,10 @@ public class SaveBodyMixin {
         var body = pe.getBody();
         body.readFromNbt(tag);
         // Re-evaluate overall/derived state after loading parts so downed persists across relogs
+        // Do NOT attempt to sync here; the network handler may not be initialized during NBT load.
+        // ServerPlayConnectionEvents.JOIN will handle syncing safely after the player is fully added.
         if (!((PlayerEntity)(Object)this).getWorld().isClient) {
             body.updateHealth();
-            if ((Object)this instanceof ServerPlayerEntity spe) {
-                ServerNetworking.syncBody(spe);
-            }
         }
     }
 }

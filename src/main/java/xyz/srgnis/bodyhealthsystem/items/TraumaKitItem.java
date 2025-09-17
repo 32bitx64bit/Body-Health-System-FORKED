@@ -41,7 +41,14 @@ public class TraumaKitItem extends Item {
 
     @Override
     public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
-        if (entity instanceof BodyProvider) {
+        if (entity instanceof BodyProvider bp) {
+            var body = bp.getBody();
+            if (body.isDowned()) {
+                if (!body.tryBeginRevive(user)) return ActionResult.FAIL;
+                if (!user.getWorld().isClient) {
+                    xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(entity);
+                }
+            }
             NbtCompound tag = stack.getOrCreateNbt();
             tag.putInt(TARGET_NBT, entity.getId());
             user.setCurrentHand(hand);
@@ -73,6 +80,8 @@ public class TraumaKitItem extends Item {
             if (target instanceof BodyProvider) {
                 Body body = ((BodyProvider) target).getBody();
                 body.endRevive(player);
+                // Notify watchers that revival has stopped
+                xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(target);
             }
             if (tag != null && tag.contains(TARGET_NBT)) {
                 tag.remove(TARGET_NBT);

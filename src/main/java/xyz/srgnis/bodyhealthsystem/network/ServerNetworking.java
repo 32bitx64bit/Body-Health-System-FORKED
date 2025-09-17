@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -29,6 +30,15 @@ public class ServerNetworking {
         ServerPlayConnectionEvents.JOIN.register(ServerNetworking::syncBody);
         ServerPlayNetworking.registerGlobalReceiver(BHSMain.MOD_IDENTIFIER, ServerNetworking::handleUseHealingItem);
         ServerPlayNetworking.registerGlobalReceiver(id("data_request"), ServerNetworking::syncBody);
+        ServerPlayNetworking.registerGlobalReceiver(id("give_up"), (server, player, handler, buf, responseSender) -> {
+            server.execute(() -> {
+                if (!(player instanceof BodyProvider)) return;
+                var body = ((BodyProvider) player).getBody();
+                if (body != null && body.isDowned()) {
+                    body.forceGiveUp();
+                }
+            });
+        });
     }
 
     private static void syncBody(MinecraftServer minecraftServer, ServerPlayerEntity serverPlayerEntity, ServerPlayNetworkHandler serverPlayNetworkHandler, PacketByteBuf packetByteBuf, PacketSender packetSender) {
@@ -54,8 +64,39 @@ public class ServerNetworking {
         // Downed sync (server authoritative)
         buf.writeBoolean(body.isDowned());
         buf.writeInt(body.getBleedOutTicksRemaining());
+        buf.writeBoolean(body.isBeingRevived());
         //Handled by ClientNetworking.updateEntity
         ServerPlayNetworking.send(player, id("data_request"), buf);
+    }
+
+    public static void broadcastBody(Entity entity) {
+        if (!(entity instanceof BodyProvider)) return;
+        // Send to the entity itself if it's a player, using the self channel (no entity lookup client-side)
+        if (entity instanceof ServerPlayerEntity self) {
+            syncSelf(self);
+        }
+        // Send to all tracking players (they need the entity id)
+        for (ServerPlayerEntity watcher : PlayerLookup.tracking(entity)) {
+            syncBody(entity, watcher);
+        }
+    }
+
+    private static void syncSelf(ServerPlayerEntity self) {
+        PacketByteBuf buf = PacketByteBufs.create();
+        var body = ((BodyProvider) self).getBody();
+        for (BodyPart part : body.getParts()) {
+            buf.writeIdentifier(part.getIdentifier());
+            buf.writeFloat(part.getHealth());
+            buf.writeFloat(part.getMaxHealth());
+            buf.writeBoolean(part.isBroken());
+            boolean hasHalf = part.getBrokenTopHalf() != null;
+            buf.writeBoolean(hasHalf);
+            if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
+        }
+        buf.writeBoolean(body.isDowned());
+        buf.writeInt(body.getBleedOutTicksRemaining());
+        buf.writeBoolean(body.isBeingRevived());
+        ServerPlayNetworking.send(self, BHSMain.MOD_IDENTIFIER, buf);
     }
 
     //TODO: to much logic here
@@ -112,27 +153,20 @@ public class ServerNetworking {
     }
 
     public static void syncBody(ServerPlayNetworkHandler spnh, PacketSender packetSender, MinecraftServer server){
-        syncBody(spnh.player);
+        // On join, schedule next-tick sync to ensure client world/entities are ready
+        ServerPlayerEntity self = spnh.player;
+        server.execute(() -> {
+            syncSelf(self);
+            syncBody(self, self);
+        });
     }
 
     public static void syncBody(PlayerEntity pe){
-        PacketByteBuf buf = PacketByteBufs.create();
-
-        var body = ((BodyProvider)pe).getBody();
-        for (BodyPart part : body.getParts()) {
-            buf.writeIdentifier(part.getIdentifier());
-            buf.writeFloat(part.getHealth());
-            buf.writeFloat(part.getMaxHealth());
-            // bone state
-            buf.writeBoolean(part.isBroken());
-            boolean hasHalf = part.getBrokenTopHalf() != null;
-            buf.writeBoolean(hasHalf);
-            if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
+        if (pe instanceof ServerPlayerEntity self) {
+            syncSelf(self);
         }
-        // Also include downed state on player self-sync
-        buf.writeBoolean(body.isDowned());
-        buf.writeInt(body.getBleedOutTicksRemaining());
-        //Handled by ClientNetworking.handleHealthChange
-        ServerPlayNetworking.send( (ServerPlayerEntity) pe, BHSMain.MOD_IDENTIFIER, buf);
+        for (ServerPlayerEntity watcher : PlayerLookup.tracking(pe)) {
+            syncBody(pe, watcher);
+        }
     }
 }

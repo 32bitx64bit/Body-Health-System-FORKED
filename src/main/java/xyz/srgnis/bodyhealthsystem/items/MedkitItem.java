@@ -1,19 +1,3 @@
-/*
- * Copyright (c) 2016, 2017, 2018, 2019 FabricMC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package xyz.srgnis.bodyhealthsystem.items;
 
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
@@ -60,6 +44,10 @@ public class MedkitItem extends Item {
 				if (!body.tryBeginRevive(user)) {
 					return ActionResult.FAIL;
 				}
+				// Inform all clients that revival has started (pauses timer UI)
+				if (!user.getWorld().isClient) {
+					xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(entity);
+				}
 				// Bind target id into item NBT for finish/cancel
 				var tag = stack.getOrCreateNbt();
 				tag.putInt(TARGET_NBT, entity.getId());
@@ -92,6 +80,8 @@ public class MedkitItem extends Item {
 				var e = world.getEntityById(tag.getInt(TARGET_NBT));
 				if (e instanceof LivingEntity le && le instanceof BodyProvider) {
 					((BodyProvider) le).getBody().endRevive(pe);
+					// Notify all clients that revival has stopped (resume timer)
+					xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(le);
 				}
 				tag.remove(TARGET_NBT);
 				if (tag.isEmpty()) stack.setNbt(null);

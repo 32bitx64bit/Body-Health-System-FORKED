@@ -70,5 +70,13 @@
   "bodyhealthsystem.midnightconfig.configVersion": "Config version",
 
   "bodyhealthsystem.midnightconfig.comment_vanilla": "Vanilla Behaviour",
-  "bodyhealthsystem.midnightconfig.forceDisableVanillaRegen": "Force disable vanilla natural regeneration"
+  "bodyhealthsystem.midnightconfig.forceDisableVanillaRegen": "Force disable vanilla natural regeneration",
+
+  "button.bodyhealthsystem.give_up": "Give Up",
+  "screen.bodyhealthsystem.downed_title": "You Are Downed",
+  "screen.bodyhealthsystem.downed_message": "You are incapacitated. Wait for revival or give up.",
+  "screen.bodyhealthsystem.downed_timer": "Time left: %s s",
+
+  "key.bodyhealthsystem.give_up": "Give Up",
+  "category.bodyhealthsystem": "Body Health System"
 }

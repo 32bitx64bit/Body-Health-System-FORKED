@@ -25,10 +25,16 @@ public class ClientNetworking {
     }
 
     private static void updateEntity(MinecraftClient client, ClientPlayNetworkHandler clientPlayNetworkHandler, PacketByteBuf buf, PacketSender packetSender) {
-        Entity entity = client.player.getWorld().getEntityById(buf.readInt());
+        // Use handler world; client.player may not be initialized yet on join
+        var world = clientPlayNetworkHandler.getWorld();
+        int entityId = buf.readInt();
+        Entity entity = world != null ? world.getEntityById(entityId) : null;
+        if (entity == null) {
+            // Drop if entity isn't available yet; server will keep us in sync via later broadcasts
+            return;
+        }
         // Read all parts first; remaining payload contains downed sync
         while (buf.isReadable()) {
-            // Peek: if next is boolean and not an Identifier, break to read state
             int readerIndex = buf.readerIndex();
             try {
                 Identifier idf = buf.readIdentifier();
@@ -38,7 +44,9 @@ public class ClientNetworking {
                 boolean hasHalf = buf.readBoolean();
                 boolean topHalf = hasHalf && buf.readBoolean();
                 client.execute(() -> {
-                    var part = ((BodyProvider) entity).getBody().getPart(idf);
+                    if (!(entity instanceof BodyProvider bp)) return;
+                    var part = bp.getBody().getPart(idf);
+                    if (part == null) return;
                     part.setMaxHealth(maxhealth);
                     part.setHealth(health);
                     part.setBroken(broken);
@@ -52,10 +60,14 @@ public class ClientNetworking {
         if (buf.isReadable()) {
             boolean downed = buf.readBoolean();
             int bleed = buf.readInt();
+            boolean revived = buf.readBoolean();
             client.execute(() -> {
-                var body = ((BodyProvider) entity).getBody();
+                if (!(entity instanceof BodyProvider bp)) return;
+                var body = bp.getBody();
+                if (body == null) return;
                 body.setDowned(downed);
                 body.setBleedOutTicksRemaining(bleed);
+                body.setBeingRevived(revived);
             });
         }
     }
@@ -72,7 +84,9 @@ public class ClientNetworking {
                 boolean hasHalf = buf.readBoolean();
                 boolean topHalf = hasHalf && buf.readBoolean();
                 client.execute(() -> {
-                    var part = ((BodyProvider) client.player).getBody().getPart(idf);
+                    if (!(client.player instanceof BodyProvider bp)) return;
+                    var part = bp.getBody().getPart(idf);
+                    if (part == null) return;
                     part.setMaxHealth(maxhealth);
                     part.setHealth(health);
                     part.setBroken(broken);
@@ -86,10 +100,14 @@ public class ClientNetworking {
         if (buf.isReadable()) {
             boolean downed = buf.readBoolean();
             int bleed = buf.readInt();
+            boolean revived = buf.readBoolean();
             client.execute(() -> {
-                var body = ((BodyProvider) client.player).getBody();
+                if (!(client.player instanceof BodyProvider bp)) return;
+                var body = bp.getBody();
+                if (body == null) return;
                 body.setDowned(downed);
                 body.setBleedOutTicksRemaining(bleed);
+                body.setBeingRevived(revived);
             });
         }
     }
