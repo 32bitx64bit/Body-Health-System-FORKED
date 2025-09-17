@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GPG",
+    "RMR",
+    "IBI"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "P": { "item": "bodyhealthsystem:morphine" },
+    "R": { "item": "bodyhealthsystem:plaster" },
+    "M": { "item": "bodyhealthsystem:medkit_upgraded" },
+    "G": { "item": "bodyhealthsystem:dressing" },
+    "B": { "item": "bodyhealthsystem:chest_brace" }
+  },
+  "result": {
+    "item": "bodyhealthsystem:trauma_kit",
+    "count": 1
+  }
+}
