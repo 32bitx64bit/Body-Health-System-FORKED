@@ -14,6 +14,7 @@ import net.minecraft.world.event.GameEvent;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.mixin.ModifyAppliedDamageInvoker;
 import xyz.srgnis.bodyhealthsystem.util.Utils;
+import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,7 +30,6 @@ public abstract class Body {
     protected int boneGraceTicksRemaining = 0; // counts down after a break
     protected boolean bonePenaltyActive = false; // once grace hits 0, periodic health loss active
     protected int bonePenaltyTickCounter = 0; // counts to 10s windows
-    protected float pendingHealthShock = 0.0f; // applied after updateHealth mapping
 
     // Downed / revival state (server authoritative, not persisted)
     protected boolean downed = false;
@@ -343,13 +343,23 @@ public abstract class Body {
                 bonePenaltyTickCounter = 0;
                 int stacks = brokenBonesCount();
                 if (stacks > 0) {
-                    float damage = 0.5f * stacks;
-                    float newHealth = player.getHealth() - damage;
-                    player.setHealth(Math.max(0.0f, newHealth));
-                    if (player.getHealth() <= 0.0f && player.isAlive()) {
-                        // Use outOfWorld damage to ensure a clean vanilla death
-                        pendingDeath = true;
-                        player.damage(player.getDamageSources().outOfWorld(), 1000.0f);
+                    float dmg = 0.5f * stacks;
+                    // Prefer torso as systemic damage target; fallback to a random non-critical part
+                    BodyPart target = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+                    if (target == null || target.getHealth() <= 0.0f) {
+                        var list = getNoCriticalParts();
+                        // Never target the head with periodic bone penalty
+                        list.removeIf(p -> p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD));
+                        if (!list.isEmpty()) {
+                            target = list.get(entity.getRandom().nextInt(list.size()));
+                        }
+                    }
+                    if (target != null) {
+                        // Apply internal damage to the body part instead of raw player HP
+                        takeDamage(dmg, player.getDamageSources().generic(), target);
+                        updateHealth();
+                        // Sync to clients so their HUD reflects the tick damage
+                        ServerNetworking.broadcastBody(player);
                     }
                 }
             }
@@ -411,18 +421,6 @@ public abstract class Body {
                 return;
             }
             entity.setHealth(entity.getMaxHealth() * ratio);
-            // Apply any pending shock from recent bone breaks after mapping
-            if (pendingHealthShock > 0.0f) {
-                float newHp = Math.max(0.0f, entity.getHealth() - pendingHealthShock);
-                entity.setHealth(newHp);
-                pendingHealthShock = 0.0f;
-                // If shock would have killed the player but head is intact, go downed instead
-                BodyPart head2 = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
-                if (newHp <= 0.0f && head2 != null && head2.getHealth() > 0.0f) {
-                    startDowned();
-                    entity.setHealth(1.0f);
-                }
-            }
         }
     }
 
@@ -459,9 +457,7 @@ public abstract class Body {
             boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining - 600);
         }
         if (entity instanceof net.minecraft.entity.player.PlayerEntity player && !entity.getWorld().isClient) {
-            // Queue a small health shock; it will be applied after updateHealth mapping
-            pendingHealthShock += 2.0f; // 2 HP = 1 heart
-            // Apply a one-time 5s blindness when a bone breaks
+            // Only cosmetic feedback on break
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
                     net.minecraft.entity.effect.StatusEffects.BLINDNESS, 100, 0, false, false));
         }
