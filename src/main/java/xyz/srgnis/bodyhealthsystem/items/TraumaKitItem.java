@@ -29,14 +29,8 @@ public class TraumaKitItem extends Item {
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        ItemStack stack = user.getStackInHand(hand);
-        NbtCompound tag = stack.getNbt();
-        if (tag != null && tag.contains(TARGET_NBT)) {
-            tag.remove(TARGET_NBT);
-            if (tag.isEmpty()) stack.setNbt(null);
-        }
-        user.setCurrentHand(hand);
-        return TypedActionResult.consume(stack);
+        // Prevent self-use; only usable when targeting another player via useOnEntity
+        return TypedActionResult.pass(user.getStackInHand(hand));
     }
 
     @Override
@@ -72,18 +66,14 @@ public class TraumaKitItem extends Item {
         if (!world.isClient && user instanceof PlayerEntity) {
             PlayerEntity player = (PlayerEntity) user;
             NbtCompound tag = stack.getNbt();
-            LivingEntity target = user;
             if (tag != null && tag.contains(TARGET_NBT)) {
                 Entity e = world.getEntityById(tag.getInt(TARGET_NBT));
-                if (e instanceof LivingEntity) target = (LivingEntity) e;
-            }
-            if (target instanceof BodyProvider) {
-                Body body = ((BodyProvider) target).getBody();
-                body.endRevive(player);
-                // Notify watchers that revival has stopped
-                xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(target);
-            }
-            if (tag != null && tag.contains(TARGET_NBT)) {
+                if (e instanceof LivingEntity target && target instanceof BodyProvider) {
+                    Body body = ((BodyProvider) target).getBody();
+                    body.endRevive(player);
+                    // Notify watchers that revival has stopped
+                    xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(target);
+                }
                 tag.remove(TARGET_NBT);
                 if (tag.isEmpty()) stack.setNbt(null);
             }
@@ -93,14 +83,17 @@ public class TraumaKitItem extends Item {
     @Override
     public ItemStack finishUsing(ItemStack stack, World world, LivingEntity user) {
         if (!world.isClient) {
-            LivingEntity target = user;
             NbtCompound tag = stack.getNbt();
-            if (tag != null && tag.contains(TARGET_NBT)) {
-                Entity e = world.getEntityById(tag.getInt(TARGET_NBT));
-                if (e instanceof LivingEntity) target = (LivingEntity) e;
-                tag.remove(TARGET_NBT);
-                if (tag.isEmpty()) stack.setNbt(null);
+            if (tag == null || !tag.contains(TARGET_NBT)) {
+                // No target set: do nothing (prevents self-use)
+                return stack;
             }
+            LivingEntity target = null;
+            Entity e = world.getEntityById(tag.getInt(TARGET_NBT));
+            if (e instanceof LivingEntity le) target = le;
+            tag.remove(TARGET_NBT);
+            if (tag.isEmpty()) stack.setNbt(null);
+
             if (target instanceof BodyProvider) {
                 Body body = ((BodyProvider) target).getBody();
                 // Attempt to perform revive if downed
