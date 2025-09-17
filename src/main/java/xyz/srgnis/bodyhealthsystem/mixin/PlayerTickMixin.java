@@ -58,18 +58,23 @@ public class PlayerTickMixin {
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 255, false, false));
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 2, false, false));
 
-            // Downed pose handled client-side to avoid constant server pose churn
-            if (player.getWorld().isClient) {
-                // Only adjust if needed, and not every tick to avoid flicker
-                if ((player.age % 4 == 0) && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
+            // Ensure pose is set on the server so all clients see it consistently
+            if (!player.getWorld().isClient) {
+                // Only change pose if not swimming and not in water
+                if (!player.isTouchingWater() && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
                     player.setSwimming(true);
                     player.setPose(EntityPose.SWIMMING);
                 }
-            } else {
                 // Server: stabilize motion only
                 player.setVelocity(0.0, 0.0, 0.0);
                 player.velocityDirty = true;
                 player.setSneaking(false);
+            } else {
+                // Client fallback to smooth visuals between server syncs
+                if (!player.isTouchingWater() && (player.age % 6 == 0) && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
+                    player.setSwimming(true);
+                    player.setPose(EntityPose.SWIMMING);
+                }
             }
             return;
         }
@@ -77,19 +82,31 @@ public class PlayerTickMixin {
         // Replace damage-based effects with bone-based system
         body.applyBrokenBonesEffects();
 
-        // Force crawling if both legs and both feet are broken (health <= 0)
-        BodyPart leftLeg = body.getPart(PlayerBodyParts.LEFT_LEG);
-        BodyPart rightLeg = body.getPart(PlayerBodyParts.RIGHT_LEG);
-        BodyPart leftFoot = body.getPart(PlayerBodyParts.LEFT_FOOT);
-        BodyPart rightFoot = body.getPart(PlayerBodyParts.RIGHT_FOOT);
+        // Force crawling only if both legs AND both feet have broken bones (bone state, not HP)
+        boolean crawlingRequired = false;
+        if (body instanceof xyz.srgnis.bodyhealthsystem.body.player.PlayerBody pb) {
+            crawlingRequired = pb.isCrawlingRequired();
+        } else {
+            BodyPart leftLeg = body.getPart(PlayerBodyParts.LEFT_LEG);
+            BodyPart rightLeg = body.getPart(PlayerBodyParts.RIGHT_LEG);
+            BodyPart leftFoot = body.getPart(PlayerBodyParts.LEFT_FOOT);
+            BodyPart rightFoot = body.getPart(PlayerBodyParts.RIGHT_FOOT);
+            boolean bothLegsBroken = leftLeg != null && rightLeg != null && leftLeg.isBroken() && rightLeg.isBroken();
+            boolean bothFeetBroken = leftFoot != null && rightFoot != null && leftFoot.isBroken() && rightFoot.isBroken();
+            crawlingRequired = bothLegsBroken && bothFeetBroken;
+        }
 
-        boolean legsAndFeetBroken = leftLeg.getHealth() <= 0.0f && rightLeg.getHealth() <= 0.0f
-                && leftFoot.getHealth() <= 0.0f && rightFoot.getHealth() <= 0.0f;
-
-        if (legsAndFeetBroken) {
-            // Force crawling pose (client only) and ensure camera lowers
-            if (player.getWorld().isClient) {
-                if ((player.age % 6 == 0) && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
+        if (crawlingRequired) {
+            // Force crawling pose; set on server so clients remain in sync
+            if (!player.getWorld().isClient) {
+                // Avoid forcing if in/entering water to prevent pose tug-of-war
+                if (!player.isTouchingWater() && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
+                    player.setSwimming(true);
+                    player.setPose(EntityPose.SWIMMING);
+                }
+            } else {
+                // Client fallback to smooth visuals between server syncs
+                if (!player.isTouchingWater() && (player.age % 8 == 0) && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
                     player.setSwimming(true);
                     player.setPose(EntityPose.SWIMMING);
                 }
@@ -111,11 +128,15 @@ public class PlayerTickMixin {
                 player.removeStatusEffect(StatusEffects.SLOWNESS);
             }
         } else {
-            // Restore normal pose client-side if not required to crawl and currently in swimming pose while not in water
-            if (player.getWorld().isClient) {
+            // Restore normal pose when not crawling/downed and not in water
+            if (!player.getWorld().isClient) {
                 if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
-                    // Only adjust occasionally to avoid flicker
-                    if (player.age % 6 == 0) {
+                    player.setSwimming(false);
+                    player.setPose(EntityPose.STANDING);
+                }
+            } else {
+                if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
+                    if (player.age % 10 == 0) {
                         player.setSwimming(false);
                         player.setPose(EntityPose.STANDING);
                     }

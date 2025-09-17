@@ -98,7 +98,10 @@ public class PlayerBody extends Body {
         BodyPart rightLeg = getPart(RIGHT_LEG);
         BodyPart leftFoot = getPart(LEFT_FOOT);
         BodyPart rightFoot = getPart(RIGHT_FOOT);
-        return leftLeg.getHealth() <= 0.0f && rightLeg.getHealth() <= 0.0f && leftFoot.getHealth() <= 0.0f && rightFoot.getHealth() <= 0.0f;
+        boolean bothLegsBroken = leftLeg != null && rightLeg != null && leftLeg.isBroken() && rightLeg.isBroken();
+        boolean bothFeetBroken = leftFoot != null && rightFoot != null && leftFoot.isBroken() && rightFoot.isBroken();
+        // Require crawling only if both legs AND both feet are broken (use bone break state, not HP)
+        return bothLegsBroken && bothFeetBroken;
     }
 
     @Override

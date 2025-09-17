@@ -16,7 +16,8 @@
     "CrawlEyeHeightMixin",
     "ProjectileHitMixin",
     "PreventJumpWhenDownedMixin",
-    "OnDeathMixin"
+    "OnDeathMixin",
+    "ForcePoseMixin"
   ],
   "client": [
     "InventoryScreenHudMixin",
