@@ -344,19 +344,59 @@ public abstract class Body {
                 int stacks = brokenBonesCount();
                 if (stacks > 0) {
                     float dmg = 0.5f * stacks;
-                    // Prefer torso as systemic damage target; fallback to a random non-critical part
-                    BodyPart target = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
-                    if (target == null || target.getHealth() <= 0.0f) {
-                        var list = getNoCriticalParts();
-                        // Never target the head with periodic bone penalty
-                        list.removeIf(p -> p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD));
-                        if (!list.isEmpty()) {
-                            target = list.get(entity.getRandom().nextInt(list.size()));
+
+                    BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+                    java.util.List<BodyPart> aliveNonHeadNonTorso = new java.util.ArrayList<>();
+                    for (BodyPart p : getParts()) {
+                        var id = p.getIdentifier();
+                        if (!id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)
+                                && !id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO)
+                                && p.getHealth() > 0.0f) {
+                            aliveNonHeadNonTorso.add(p);
                         }
                     }
+
+                    boolean othersDestroyed = allOtherNonHeadPartsDestroyed();
+
+                    BodyPart target = null;
+                    // If torso is at/below 2 HP and not all other parts are destroyed, avoid using torso
+                    if (torso != null && torso.getHealth() <= 2.0f && !othersDestroyed) {
+                        if (!aliveNonHeadNonTorso.isEmpty()) {
+                            target = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
+                        }
+                    } else {
+                        // Prefer torso otherwise; if unsuitable, pick a random other alive part
+                        target = torso;
+                        if (target == null || target.getHealth() <= 0.0f) {
+                            if (!aliveNonHeadNonTorso.isEmpty()) {
+                                target = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
+                            }
+                        }
+                    }
+
                     if (target != null) {
-                        // Apply internal damage to the body part instead of raw player HP
-                        takeDamage(dmg, player.getDamageSources().generic(), target);
+                        if (target == torso && torso != null && torso.getHealth() > 0.0f && !othersDestroyed && torso.getHealth() <= 2.0f) {
+                            // Shouldn't happen due to selection, but guard anyway
+                            if (!aliveNonHeadNonTorso.isEmpty()) {
+                                BodyPart reroute = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
+                                takeDamage(dmg, player.getDamageSources().generic(), reroute);
+                            }
+                        } else if (target == torso && torso != null && !othersDestroyed && torso.getHealth() > 2.0f) {
+                            // Clamp torso damage so it never drops below 2 HP while others are not destroyed
+                            float allowed = Math.max(0.0f, torso.getHealth() - 2.0f);
+                            float toTorso = Math.min(dmg, allowed);
+                            float remainder = dmg - toTorso;
+                            if (toTorso > 0.0f) {
+                                takeDamage(toTorso, player.getDamageSources().generic(), torso);
+                            }
+                            if (remainder > 0.0f && !aliveNonHeadNonTorso.isEmpty()) {
+                                BodyPart reroute = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
+                                takeDamage(remainder, player.getDamageSources().generic(), reroute);
+                            }
+                        } else {
+                            // Normal application
+                            takeDamage(dmg, player.getDamageSources().generic(), target);
+                        }
                         updateHealth();
                         // Sync to clients so their HUD reflects the tick damage
                         ServerNetworking.broadcastBody(player);
@@ -614,6 +654,18 @@ public abstract class Body {
             if (p.getHealth() <= 0.0f) p.setHealth(1.0f);
             count--;
         }
+    }
+
+    private boolean allOtherNonHeadPartsDestroyed() {
+        for (BodyPart p : getParts()) {
+            var id = p.getIdentifier();
+            if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)
+                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO)) {
+                continue;
+            }
+            if (p.getHealth() > 0.0f) return false;
+        }
+        return true;
     }
 
     protected boolean anyBoneBroken() {
