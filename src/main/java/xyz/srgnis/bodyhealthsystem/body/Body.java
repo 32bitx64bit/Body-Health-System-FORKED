@@ -13,6 +13,7 @@ import net.minecraft.util.Identifier;
 import net.minecraft.world.event.GameEvent;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.mixin.ModifyAppliedDamageInvoker;
+import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
 import xyz.srgnis.bodyhealthsystem.util.Utils;
 import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 
@@ -294,6 +295,8 @@ public abstract class Body {
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS);
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE);
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.WEAKNESS);
+            // Clear bleeding indicator
+            player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);
             return;
         }
 
@@ -334,6 +337,15 @@ public abstract class Body {
         if (bothFeetBroken()) {
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
                     net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, 0, false, false));
+        }
+
+        // Apply/refresh the bleeding indicator: show during last 10s of grace and while bleeding is active
+        boolean showBleeding = bonePenaltyActive || (!bonePenaltyActive && boneGraceTicksRemaining <= 200);
+        if (showBleeding) {
+            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                    ModStatusEffects.BLEEDING_EFFECT, 40, 0, false, true));
+        } else {
+            player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);
         }
 
         // Periodic health penalty once grace elapsed
