@@ -69,6 +69,9 @@ public abstract class Body {
         for(BodyPart part : getParts()){
             part.writeToNbt(new_nbt);
         }
+        // Persist downed-related state so behavior continues after relog
+        new_nbt.putBoolean("downed", this.downed);
+        new_nbt.putInt("bleedOutTicksRemaining", this.bleedOutTicksRemaining);
         nbt.put(BHSMain.MOD_ID, new_nbt);
     }
 
@@ -85,6 +88,16 @@ public abstract class Body {
                         noCriticalParts.put(part.getIdentifier(), part);
                     }
                 }
+            }
+            // Restore downed-related state
+            if (bodyNbt.contains("downed")) {
+                this.downed = bodyNbt.getBoolean("downed");
+            }
+            if (bodyNbt.contains("bleedOutTicksRemaining")) {
+                this.bleedOutTicksRemaining = bodyNbt.getInt("bleedOutTicksRemaining");
+            } else if (this.downed && this.bleedOutTicksRemaining <= 0) {
+                // Fallback to a default bleedout timer if missing
+                this.bleedOutTicksRemaining = isTorsoBroken() ? (40 * 20) : (80 * 20);
             }
         }
     }
