@@ -25,3 +25,7 @@ https://modrinth.com/mod/jei
 Many thanks to @Blayung for his fixes of the HUD 
 
 And thanks to @SrGnis for making the original mod.
+
+## TODO 
+
+Add a wiki.
