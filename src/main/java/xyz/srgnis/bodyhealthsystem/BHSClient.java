@@ -7,6 +7,7 @@ import xyz.srgnis.bodyhealthsystem.network.ClientNetworking;
 import xyz.srgnis.bodyhealthsystem.registry.Screens;
 import xyz.srgnis.bodyhealthsystem.client.input.GiveUpKeyHandler;
 import xyz.srgnis.bodyhealthsystem.client.screen.DownedOverlayController;
+import xyz.srgnis.bodyhealthsystem.client.input.OpenHealthScreenKeyHandler;
 
 public class BHSClient implements ClientModInitializer {
     @Override
@@ -15,6 +16,7 @@ public class BHSClient implements ClientModInitializer {
         ClientNetworking.initialize();
         Screens.registerScreens();
         GiveUpKeyHandler.initClient();
+        OpenHealthScreenKeyHandler.initClient();
         DownedOverlayController.initClient();
     }
 }

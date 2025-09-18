@@ -77,5 +77,6 @@
   "screen.bodyhealthsystem.downed_timer": "Time left: %s s",
 
   "key.bodyhealthsystem.give_up": "Give Up",
+  "key.bodyhealthsystem.open_health": "Open Health Screen",
   "category.bodyhealthsystem": "Body Health System"
 }
