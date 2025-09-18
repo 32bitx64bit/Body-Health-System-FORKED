@@ -7,9 +7,7 @@ import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
-import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.ActionResult;
@@ -18,7 +16,8 @@ import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.World;
 
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
-import xyz.srgnis.bodyhealthsystem.client.screen.HealScreenHandler;
+import xyz.srgnis.bodyhealthsystem.client.screen.BodyOperationsScreenHandler;
+import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 
 //FIXME: null pointers
 public class MedkitItem extends Item {
@@ -125,7 +124,7 @@ public class MedkitItem extends Item {
 
 			@Override
 			public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-				return new HealScreenHandler(syncId, inventory, stack, entity);
+				return new BodyOperationsScreenHandler(syncId, inventory, stack, entity);
 			}
 
 			@Override

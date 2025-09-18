@@ -5,11 +5,10 @@ import xyz.srgnis.bodyhealthsystem.client.screen.BodyOperationsScreen;
 import xyz.srgnis.bodyhealthsystem.client.screen.BodyOperationsScreenHandler;
 import xyz.srgnis.bodyhealthsystem.client.screen.HealScreen;
 
-public class Screens {
+public class Screens2 {
     public static void registerScreens() {
-        // Register unified Body Operations screen
         HandledScreens.register(ScreenHandlers.BODY_OPS_SCREEN_HANDLER, BodyOperationsScreen::new);
-        // Keep legacy heal screen (will be phased out)
+        // Keep existing heal screen registration for now (will migrate callers)
         HandledScreens.register(ScreenHandlers.HEAL_SCREEN_HANDLER, HealScreen::new);
     }
 }

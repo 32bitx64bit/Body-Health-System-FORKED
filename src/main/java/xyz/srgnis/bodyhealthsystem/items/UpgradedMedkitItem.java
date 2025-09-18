@@ -16,7 +16,7 @@ import net.minecraft.util.TypedActionResult;
 import net.minecraft.world.World;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
-import xyz.srgnis.bodyhealthsystem.client.screen.HealScreenHandler;
+import xyz.srgnis.bodyhealthsystem.client.screen.BodyOperationsScreenHandler;
 
 public class UpgradedMedkitItem extends Item {
     private static final String TARGET_NBT = "UpgMedkitTargetId";
@@ -113,7 +113,7 @@ public class UpgradedMedkitItem extends Item {
         return new ExtendedScreenHandlerFactory() {
             @Override
             public ScreenHandler createMenu(int syncId, PlayerInventory inventory, PlayerEntity player) {
-                return new HealScreenHandler(syncId, inventory, stack, entity);
+                return new BodyOperationsScreenHandler(syncId, inventory, stack, entity);
             }
 
             @Override
