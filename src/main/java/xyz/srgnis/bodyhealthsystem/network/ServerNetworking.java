@@ -39,6 +39,20 @@ public class ServerNetworking {
                 }
             });
         });
+        // Temperature request/response
+        ServerPlayNetworking.registerGlobalReceiver(id("temp_request"), (server, player, handler, buf, responseSender) -> {
+            int entityId = buf.readInt();
+            server.execute(() -> {
+                Entity e = player.getWorld().getEntityById(entityId);
+                if (!(e instanceof ServerPlayerEntity spe)) return;
+                double tempC = 0.0;
+                try { tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe); } catch (Throwable ignored) {}
+                PacketByteBuf out = PacketByteBufs.create();
+                out.writeInt(entityId);
+                out.writeDouble(tempC);
+                ServerPlayNetworking.send(player, id("temp_sync"), out);
+            });
+        });
     }
 
     private static void syncBody(MinecraftServer minecraftServer, ServerPlayerEntity serverPlayerEntity, ServerPlayNetworkHandler serverPlayNetworkHandler, PacketByteBuf packetByteBuf, PacketSender packetSender) {

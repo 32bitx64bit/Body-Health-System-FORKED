@@ -36,6 +36,7 @@
     "fabricloader": ">=0.14.9",
     "fabric-api": "*",
     "minecraft": "~1.20",
-    "java": ">=17"
+    "java": ">=17",
+    "temperatureapi": ">=1.0.1"
   }
 }

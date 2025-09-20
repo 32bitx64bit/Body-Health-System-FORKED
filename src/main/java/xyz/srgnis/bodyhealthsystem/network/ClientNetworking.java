@@ -13,15 +13,24 @@ import net.minecraft.util.Identifier;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
 
 //FIXME: this is a bit of a mess
 //FIXME: null pointers
 public class ClientNetworking {
+    private static final Map<Integer, Double> LAST_BODY_TEMP_C = new ConcurrentHashMap<>();
 
     public static void initialize(){
         ClientPlayNetworking.registerGlobalReceiver(BHSMain.MOD_IDENTIFIER, ClientNetworking::handleHealthChange);
         ClientPlayNetworking.registerGlobalReceiver(id("data_request"), ClientNetworking::updateEntity);
+        ClientPlayNetworking.registerGlobalReceiver(id("temp_sync"), (client, handler, buf, sender) -> {
+            int entityId = buf.readInt();
+            double tempC = buf.readDouble();
+            client.execute(() -> LAST_BODY_TEMP_C.put(entityId, tempC));
+        });
     }
 
     private static void updateEntity(MinecraftClient client, ClientPlayNetworkHandler clientPlayNetworkHandler, PacketByteBuf buf, PacketSender packetSender) {
@@ -33,7 +42,7 @@ public class ClientNetworking {
             // Drop if entity isn't available yet; server will keep us in sync via later broadcasts
             return;
         }
-        // Read all parts first; remaining payload contains downed sync
+        // Read all parts first; remaining payload contains downed sync and temperature
         while (buf.isReadable()) {
             int readerIndex = buf.readerIndex();
             try {
@@ -70,10 +79,11 @@ public class ClientNetworking {
                 body.setBeingRevived(revived);
             });
         }
+        // No trailing fields expected
     }
 
     public static void handleHealthChange(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender sender){
-        // Read all parts; remaining payload contains optional downed sync
+        // Read all parts; remaining payload contains optional downed sync and temperature
         while (buf.isReadable()) {
             int readerIndex = buf.readerIndex();
             try {
@@ -110,6 +120,7 @@ public class ClientNetworking {
                 body.setBeingRevived(revived);
             });
         }
+        // No trailing fields expected
     }
 
     public static void useHealingItem(Entity entity, Identifier partID, ItemStack itemStack){
@@ -127,6 +138,11 @@ public class ClientNetworking {
 
         buf.writeInt(entity.getId());
 
-        ClientPlayNetworking.send(id("data_request"), buf);
+        ClientPlayNetworking.send(id("temp_request"), buf);
+    }
+
+    public static Double getLastBodyTempC(Entity entity) {
+        if (entity == null) return null;
+        return LAST_BODY_TEMP_C.get(entity.getId());
     }
 }

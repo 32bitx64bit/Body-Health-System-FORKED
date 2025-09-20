@@ -12,7 +12,15 @@ group = project.maven_group
 
 repositories {
 	mavenCentral()
-	maven {url "https://maven.terraformersmc.com/releases/"}
+	maven { url "https://maven.terraformersmc.com/releases/" }
+	// Fetch TemperatureAPI from GitHub Releases via Ivy
+	ivy {
+		url "https://github.com/32bitx64bit/TemperatureAPI/releases/download"
+		patternLayout {
+			artifact("/[revision]/[artifact]-[revision].[ext]")
+		}
+		metadataSources { artifact() } // no Ivy/Maven metadata; derive from artifact coords
+	}
 }
 
 dependencies {
@@ -23,6 +31,9 @@ dependencies {
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+	// Temperature API (fetched from GitHub Releases via Ivy)
+	modImplementation "temperatureapi:temperatureapi:1.0.1@jar"
 
 	// Mixin Extras: depend at dev/runtime, but DO NOT jar-in-jar to avoid version clashes in modpacks
 	// Let the modpack provide a single version (e.g. 0.5.0). This keeps us compatible with newer Fabric API modules

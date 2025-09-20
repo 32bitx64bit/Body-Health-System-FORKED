@@ -15,9 +15,11 @@ import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts;
 import xyz.srgnis.bodyhealthsystem.constants.GUIConstants;
 import xyz.srgnis.bodyhealthsystem.network.ClientNetworking;
+import gavinx.temperatureapi.api.BodyTemperatureAPI;
 
 import static xyz.srgnis.bodyhealthsystem.util.Draw.drawHealthRectangle;
 import static xyz.srgnis.bodyhealthsystem.util.Draw.selectHealthColor;
+import static xyz.srgnis.bodyhealthsystem.util.Draw.selectTemperatureColor;
 
 /**
  * Unified GUI for all health operations:
@@ -68,6 +70,13 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     private boolean boneLayerWasEnabledOnOpen = false;
     private boolean usedMedkit = false;
 
+    // Temperature view state
+    private boolean showTemperature = false;
+    private double bodyTempC = BodyTemperatureAPI.NORMAL_BODY_TEMP_C;
+    private long lastUpdateNanos = 0L;
+    private long lastTempRequestNanos = 0L;
+    private ButtonWidget tempToggleBtn;
+
     public BodyOperationsScreen(BodyOperationsScreenHandler handler, PlayerInventory inventory, Text title) {
         super(handler, inventory, title);
         // Window size is a scaled version of the GUI art region
@@ -86,6 +95,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         }
         computeBodyScale();
         addWidgets();
+        lastUpdateNanos = System.nanoTime();
+        bodyTempC = BodyTemperatureAPI.NORMAL_BODY_TEMP_C;
     }
 
     private void addWidgets() {
@@ -127,6 +138,18 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         addDrawableChild(ButtonWidget.builder(Text.literal("Bone Layer"), b -> {
             BONE_LAYER_ENABLED = !BONE_LAYER_ENABLED;
         }).dimensions(btnX, btnY, btnW, btnH).build());
+
+        int btnY2 = btnY + btnH + Math.round(6 * DRAW_SCALE);
+        tempToggleBtn = ButtonWidget.builder(Text.literal(showTemperature ? "Show Health" : "Show Temp"), b -> {
+            showTemperature = !showTemperature;
+            tempToggleBtn.setMessage(Text.literal(showTemperature ? "Show Health" : "Show Temp"));
+            if (showTemperature && this.handler.getEntity() != null) {
+                // Request immediate server temperature when switching on
+                ClientNetworking.requestBodyData(this.handler.getEntity());
+                lastTempRequestNanos = System.nanoTime();
+            }
+        }).dimensions(btnX, btnY2, btnW, btnH).build();
+        addDrawableChild(tempToggleBtn);
     }
 
     // Compute the body scale so it fits in the left column
@@ -203,20 +226,41 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
 
     @Override
     public void render(DrawContext drawContext, int mouseX, int mouseY, float delta) {
+        // Temperature view: pull server-authoritative value periodically
+        if (showTemperature) {
+            long now = System.nanoTime();
+            // consume last known value from networking map
+            LivingEntity target = handler.getEntity();
+            if (target != null) {
+                Double sv = ClientNetworking.getLastBodyTempC(target);
+                if (sv != null) bodyTempC = sv;
+            }
+            // request an update at most 4 times per second
+            if (lastTempRequestNanos == 0L || (now - lastTempRequestNanos) > 250_000_000L) {
+                if (target != null) ClientNetworking.requestBodyData(target);
+                lastTempRequestNanos = now;
+            }
+            // clamp to plausible human range
+            if (bodyTempC < 30.0) bodyTempC = 30.0;
+            if (bodyTempC > 42.5) bodyTempC = 42.5;
+        }
+
         this.renderBackground(drawContext);
         super.render(drawContext, mouseX, mouseY, delta);
         // Numbers overlay
         drawNumbers(drawContext);
-        // Tooltips for parts
-        for (var child : this.children()) {
-            if (child instanceof PartButton b && b.isMouseOver(mouseX, mouseY)) {
-                BodyPart part = handler.getBody().getPart(b.partId);
-                if (part != null) {
-                    java.util.List<Text> list = new java.util.ArrayList<>();
-                    list.add(Text.literal(part.getIdentifier().getPath()));
-                    list.add(Text.literal("" + Math.round(part.getHealth()) + "/" + Math.round(part.getMaxHealth())));
-                    if (part.isBroken()) list.add(Text.literal("Broken"));
-                    drawContext.drawTooltip(this.textRenderer, list, mouseX, mouseY);
+        // Tooltips for parts (only when showing health)
+        if (!showTemperature) {
+            for (var child : this.children()) {
+                if (child instanceof PartButton b && b.isMouseOver(mouseX, mouseY)) {
+                    BodyPart part = handler.getBody().getPart(b.partId);
+                    if (part != null) {
+                        java.util.List<Text> list = new java.util.ArrayList<>();
+                        list.add(Text.literal(part.getIdentifier().getPath()));
+                        list.add(Text.literal("" + Math.round(part.getHealth()) + "/" + Math.round(part.getMaxHealth())));
+                        if (part.isBroken()) list.add(Text.literal("Broken"));
+                        drawContext.drawTooltip(this.textRenderer, list, mouseX, mouseY);
+                    }
                 }
             }
         }
@@ -245,6 +289,16 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int baseY = top + Math.max(0, (availH - bodyHpx) / 2);
         var tr = MinecraftClient.getInstance().textRenderer;
         int white = 0xFFFFFF;
+
+        if (showTemperature) {
+            String tempStr = String.format("%.1f°C", bodyTempC);
+            int textW = tr.getWidth(tempStr);
+            // Center roughly over torso
+            int torsoCenterX = baseX + sx(GUIConstants.SCALED_TORSO_X_OFFSET) + sx(GUIConstants.SCALED_TORSO_WIDTH) / 2;
+            int torsoCenterY = baseY + sy(GUIConstants.SCALED_TORSO_Y_OFFSET) + sy(GUIConstants.SCALED_TORSO_HEIGHT) / 2 - 4;
+            ctx.drawTextWithShadow(tr, tempStr, torsoCenterX - textW / 2, torsoCenterY, 0xFFFFFF);
+            return;
+        }
 
         BodyPart head = handler.getBody().getPart(PlayerBodyParts.HEAD);
         String headStr = formatHealth(head);
@@ -302,9 +356,10 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
 
     private void drawPart(DrawContext ctx, Identifier partId, int x, int y, int w, int h) {
         BodyPart p = handler.getBody().getPart(partId);
-        int color = selectHealthColor(p);
+        int color = showTemperature ? selectTemperatureColor(bodyTempC) : selectHealthColor(p);
         drawHealthRectangle(ctx, x, y, w, h, color);
 
+        if (showTemperature) return; // no bone overlay in temperature mode
         if (!BONE_LAYER_ENABLED) return;
 
         boolean broken = p.isBroken();
