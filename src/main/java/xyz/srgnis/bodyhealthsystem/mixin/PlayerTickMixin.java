@@ -4,7 +4,9 @@ import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -17,6 +19,8 @@ import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 
 @Mixin(PlayerEntity.class)
 public class PlayerTickMixin {
+    @Unique private int bhs$heatTickCounter = 0;
+
     @Inject(method = "tick", at = @At("HEAD"))
     public void onTick(CallbackInfo ci){
         PlayerEntity player = (PlayerEntity) (Object) this;
@@ -47,7 +51,20 @@ public class PlayerTickMixin {
             if (body.isDowned() && (player.age % 20 == 0)) {
                 ServerNetworking.broadcastBody(player);
             }
+
+            // Keep only the instant-death check early so it still works even if player becomes downed
+            if (player instanceof ServerPlayerEntity spe) {
+                double tempC = 0.0;
+                try {
+                    tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe);
+                } catch (Throwable ignored) {}
+                if (tempC >= 44.0) {
+                    player.damage(player.getDamageSources().outOfWorld(), 1000.0f);
+                    return;
+                }
+            }
         }
+
         if (body.isDowned()) {
             // Hard immobilize: extreme slowness and mining fatigue, prevent sprinting and jumping
             player.setSprinting(false);
@@ -141,6 +158,54 @@ public class PlayerTickMixin {
                         player.setPose(EntityPose.STANDING);
                     }
                 }
+            }
+        }
+
+        // AFTER bones/crawling: apply heat stroke effects and damage so they aren't wiped by our own system
+        if (!player.getWorld().isClient && player instanceof ServerPlayerEntity spe) {
+            double tempC = 0.0;
+            try {
+                tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe);
+            } catch (Throwable ignored) {}
+
+            if (tempC >= 40.0) {
+                // Base: Weakness I + Slowness I
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 0, false, false));
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 0, false, false));
+            }
+            if (tempC >= 41.0) {
+                // Escalate weakness to II
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 1, false, false));
+            }
+            if (tempC >= 42.0) {
+                // Slow periodic damage to a random non-head part; prevent bone breaks
+                bhs$heatTickCounter++;
+                if (bhs$heatTickCounter >= 40) { // every ~2s
+                    bhs$heatTickCounter = 0;
+                    java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
+                    for (BodyPart p : body.getNoCriticalParts()) {
+                        if (p.getHealth() > 0.0f && !p.getIdentifier().equals(PlayerBodyParts.HEAD)) {
+                            candidates.add(p);
+                        }
+                    }
+                    if (candidates.isEmpty()) {
+                        // Fallback to any alive part excluding head
+                        for (BodyPart p : body.getParts()) {
+                            if (p.getHealth() > 0.0f && !p.getIdentifier().equals(PlayerBodyParts.HEAD)) {
+                                candidates.add(p);
+                            }
+                        }
+                    }
+                    if (!candidates.isEmpty()) {
+                        BodyPart target = candidates.get(player.getRandom().nextInt(candidates.size()));
+                        body.applyNonBreakingDamage(1.0f, player.getDamageSources().generic(), target);
+                        body.updateHealth();
+                        ServerNetworking.broadcastBody(player);
+                    }
+                }
+            } else {
+                // Below 42C, reset periodic counter
+                if (bhs$heatTickCounter > 40) bhs$heatTickCounter = 40;
             }
         }
     }

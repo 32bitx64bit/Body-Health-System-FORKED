@@ -431,6 +431,17 @@ public abstract class Body {
         }
     }
 
+    // Public helper to apply damage to a target body part without triggering bone breaks
+    public void applyNonBreakingDamage(float amount, net.minecraft.entity.damage.DamageSource source, BodyPart target) {
+        if (target == null || amount <= 0.0f) return;
+        suppressBoneBreakEvaluation = true;
+        try {
+            takeDamage(amount, source, target);
+        } finally {
+            suppressBoneBreakEvaluation = false;
+        }
+    }
+
     public void applyStatusEffectWithAmplifier(StatusEffect effect, int amplifier){
         if(amplifier >= 0){
             // Cap slowness at II when crawling is required (handled in PlayerBody.applyCriticalPartsEffect)
