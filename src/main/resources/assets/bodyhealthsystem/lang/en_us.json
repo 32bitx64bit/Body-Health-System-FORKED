@@ -15,6 +15,9 @@
   "effect.bodyhealthsystem.adrenaline_effect": "Adrenaline",
   "effect.bodyhealthsystem.dressing_effect": "Dressing Applied",
   "effect.bodyhealthsystem.bleeding_effect": "Bleeding",
+  "effect.bodyhealthsystem.mildhypo": "Mild Hypothermia",
+  "effect.bodyhealthsystem.modhypo": "Moderate Hypothermia",
+  "effect.bodyhealthsystem.servhypo": "Severe Hypothermia",
 
   "bodyhealthsystem.midnightconfig.title": "Body Health System",
 
@@ -78,5 +81,10 @@
 
   "key.bodyhealthsystem.give_up": "Give Up",
   "key.bodyhealthsystem.open_health": "Open Health Screen",
-  "category.bodyhealthsystem": "Body Health System"
+  "category.bodyhealthsystem": "Body Health System",
+
+  "effect.bodyhealthsystem.heatstrokeinit": "Heat Stroke (Initial)",
+  "effect.bodyhealthsystem.heatstrokemod": "Heat Stroke (Moderate)",
+  "effect.bodyhealthsystem.heatstrokeserv": "Heat Stroke (Severe)"
+  
 }

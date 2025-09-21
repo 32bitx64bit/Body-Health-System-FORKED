@@ -319,7 +319,7 @@ public abstract class Body {
         if (brokenCount > 0) {
             int amp = Math.max(0, brokenCount - 1);
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, amp, false, false));
+                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, amp, false, false, false));
         }
 
         // Arms: mining fatigue
@@ -327,26 +327,26 @@ public abstract class Body {
         if (brokenArms > 0) {
             int amp = Math.max(0, brokenArms - 1);
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE, 40, amp, false, false));
+                    net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE, 40, amp, false, false, false));
         }
 
         // Torso: weakness II when torso bone is broken
         if (isTorsoBroken()) {
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.WEAKNESS, 40, 1, false, false));
+                    net.minecraft.entity.effect.StatusEffects.WEAKNESS, 40, 1, false, false, false));
         }
 
         // Feet: if BOTH feet are broken, add Slowness I extra (stacks with overall slowness)
         if (bothFeetBroken()) {
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, 0, false, false));
+                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, 0, false, false, false));
         }
 
         // Apply/refresh the bleeding indicator: show during last 10s of grace and while bleeding is active
         boolean showBleeding = bonePenaltyActive || (!bonePenaltyActive && boneGraceTicksRemaining <= 200);
         if (showBleeding) {
             player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    ModStatusEffects.BLEEDING_EFFECT, 40, 0, false, true));
+                    ModStatusEffects.BLEEDING_EFFECT, 40, 0, false, true, true));
         } else {
             player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);
         }

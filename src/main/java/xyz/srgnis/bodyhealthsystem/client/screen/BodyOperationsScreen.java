@@ -240,9 +240,6 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                 if (target != null) ClientNetworking.requestBodyData(target);
                 lastTempRequestNanos = now;
             }
-            // clamp to plausible human range
-            if (bodyTempC < 30.0) bodyTempC = 30.0;
-            if (bodyTempC > 42.5) bodyTempC = 42.5;
         }
 
         this.renderBackground(drawContext);

@@ -22,7 +22,8 @@
   "client": [
     "InventoryScreenHudMixin",
     "HandledScreenAccessor",
-    "BlockInventoryWhileDownedMixin"
+    "BlockInventoryWhileDownedMixin",
+    "InventoryStatusEffectFilterMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -19,7 +19,58 @@ import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 
 @Mixin(PlayerEntity.class)
 public class PlayerTickMixin {
+    @Unique
+    private static void clearHeatConditions(PlayerEntity p) {
+        p.removeStatusEffect(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HEAT_STROKE_INIT);
+        p.removeStatusEffect(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HEAT_STROKE_MOD);
+        p.removeStatusEffect(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HEAT_STROKE_SERV);
+    }
+
+    @Unique
+    private static void clearColdConditions(PlayerEntity p) {
+        p.removeStatusEffect(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HYPO_MILD);
+        p.removeStatusEffect(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HYPO_MOD);
+        p.removeStatusEffect(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HYPO_SERV);
+    }
+
+    @Unique
+    private static void setHeatConditionStage(PlayerEntity p, int stage) {
+        clearHeatConditions(p);
+        switch (stage) {
+            case 1 -> p.addStatusEffect(new StatusEffectInstance(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HEAT_STROKE_INIT, 40, 0, false, true, true));
+            case 2 -> p.addStatusEffect(new StatusEffectInstance(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HEAT_STROKE_MOD, 40, 0, false, true, true));
+            case 3 -> p.addStatusEffect(new StatusEffectInstance(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HEAT_STROKE_SERV, 40, 0, false, true, true));
+        }
+    }
+
+    @Unique
+    private static void setColdConditionStage(PlayerEntity p, int stage) {
+        clearColdConditions(p);
+        switch (stage) {
+            case 1 -> p.addStatusEffect(new StatusEffectInstance(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HYPO_MILD, 40, 0, false, true, true));
+            case 2 -> p.addStatusEffect(new StatusEffectInstance(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HYPO_MOD, 40, 0, false, true, true));
+            case 3 -> p.addStatusEffect(new StatusEffectInstance(xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects.HYPO_SERV, 40, 0, false, true, true));
+        }
+    }
+    @Unique
+    private static java.util.List<BodyPart> pickColdTargets(Body body) {
+        java.util.List<BodyPart> out = new java.util.ArrayList<>();
+        BodyPart la = body.getPart(PlayerBodyParts.LEFT_ARM);
+        BodyPart ra = body.getPart(PlayerBodyParts.RIGHT_ARM);
+        BodyPart ll = body.getPart(PlayerBodyParts.LEFT_LEG);
+        BodyPart rl = body.getPart(PlayerBodyParts.RIGHT_LEG);
+        BodyPart lf = body.getPart(PlayerBodyParts.LEFT_FOOT);
+        BodyPart rf = body.getPart(PlayerBodyParts.RIGHT_FOOT);
+        if (la != null && la.getHealth() > 0.0f) out.add(la);
+        if (ra != null && ra.getHealth() > 0.0f) out.add(ra);
+        if (ll != null && ll.getHealth() > 0.0f) out.add(ll);
+        if (rl != null && rl.getHealth() > 0.0f) out.add(rl);
+        if (lf != null && lf.getHealth() > 0.0f) out.add(lf);
+        if (rf != null && rf.getHealth() > 0.0f) out.add(rf);
+        return out;
+    }
     @Unique private int bhs$heatTickCounter = 0;
+    @Unique private int bhs$coldTickCounter = 0;
 
     @Inject(method = "tick", at = @At("HEAD"))
     public void onTick(CallbackInfo ci){
@@ -161,26 +212,35 @@ public class PlayerTickMixin {
             }
         }
 
-        // AFTER bones/crawling: apply heat stroke effects and damage so they aren't wiped by our own system
+        // AFTER bones/crawling: apply heat stroke and hypothermia effects so they aren't wiped by our own system
         if (!player.getWorld().isClient && player instanceof ServerPlayerEntity spe) {
             double tempC = 0.0;
             try {
                 tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe);
             } catch (Throwable ignored) {}
 
+            // Heat stroke chain
             if (tempC >= 40.0) {
-                // Base: Weakness I + Slowness I
-                player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 0, false, false));
-                player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 0, false, false));
+                // Base: Weakness I + Slowness I (hidden)
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 0, false, false, false));
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 0, false, false, false));
+                // Condition icon (initial/moderate/severe)
+                if (tempC < 41.0) {
+                    setHeatConditionStage(player, 1);
+                }
             }
             if (tempC >= 41.0) {
-                // Escalate weakness to II
-                player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 1, false, false));
+                // Escalate weakness to II (hidden)
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 1, false, false, false));
+                if (tempC < 42.0) {
+                    setHeatConditionStage(player, 2);
+                }
             }
             if (tempC >= 42.0) {
+                setHeatConditionStage(player, 3);
                 // Slow periodic damage to a random non-head part; prevent bone breaks
                 bhs$heatTickCounter++;
-                if (bhs$heatTickCounter >= 40) { // every ~2s
+                if (bhs$heatTickCounter >= 200) { // every ~10s
                     bhs$heatTickCounter = 0;
                     java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
                     for (BodyPart p : body.getNoCriticalParts()) {
@@ -206,6 +266,57 @@ public class PlayerTickMixin {
             } else {
                 // Below 42C, reset periodic counter
                 if (bhs$heatTickCounter > 40) bhs$heatTickCounter = 40;
+            }
+
+            // Hypothermia chain
+            if (tempC < 35.0) {
+                if (tempC >= 32.0) {
+                    // Mild: 35..32C
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 0, false, false, false));
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 0, false, false, false));
+                    setColdConditionStage(player, 1);
+                } else if (tempC >= 28.0) {
+                    // Moderate: 32..28C
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 1, false, false, false));
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 0, false, false, false));
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 1, false, false, false));
+                    setColdConditionStage(player, 2);
+                    // Periodic damage every 60s to arms/legs/feet
+                    bhs$coldTickCounter++;
+                    if (bhs$coldTickCounter >= 1200) {
+                        bhs$coldTickCounter = 0;
+                        java.util.List<BodyPart> targets = pickColdTargets(body);
+                        if (!targets.isEmpty()) {
+                            BodyPart t = targets.get(player.getRandom().nextInt(targets.size()));
+                            body.applyNonBreakingDamage(1.0f, player.getDamageSources().generic(), t);
+                            body.updateHealth();
+                            ServerNetworking.broadcastBody(player);
+                        }
+                    }
+                } else {
+                    // Severe: <28C
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 1, false, false, false));
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 1, false, false, false));
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 2, false, false, false));
+                    setColdConditionStage(player, 3);
+                    // Periodic damage every 10s to arms/legs/feet
+                    bhs$coldTickCounter++;
+                    if (bhs$coldTickCounter >= 200) {
+                        bhs$coldTickCounter = 0;
+                        java.util.List<BodyPart> targets = pickColdTargets(body);
+                        if (!targets.isEmpty()) {
+                            BodyPart t = targets.get(player.getRandom().nextInt(targets.size()));
+                            body.applyNonBreakingDamage(1.0f, player.getDamageSources().generic(), t);
+                            body.updateHealth();
+                            ServerNetworking.broadcastBody(player);
+                        }
+                    }
+                }
+            } else {
+                // No hypothermia: gently let counter drift down so that entering range doesn't instantly hit
+                if (bhs$coldTickCounter > 0) bhs$coldTickCounter--;
+                // Clear condition icons if warming up out of hypo range
+                clearColdConditions(player);
             }
         }
     }
