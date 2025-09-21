@@ -29,3 +29,5 @@ And thanks to @SrGnis for making the original mod.
 ## TODO 
 
 Add a wiki.
+
+Add items for the new temperature API, Armors, blocked, etc to help players resist the cold / heat before the 5.0 release.
