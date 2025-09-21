@@ -57,6 +57,9 @@ public class Config extends MidnightConfig {
     @Comment(centered = true) public static Comment comment_inventoryHud;
     @Entry public static boolean showInventoryBodyHud = true;
 
+    @Comment(centered = true) public static Comment comment_temperature;
+    @Entry public static boolean enableTemperatureSystem = true;
+
     public enum HudPosition {
         TOP_RIGHT,
         TOP_LEFT,

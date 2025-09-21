@@ -227,7 +227,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     @Override
     public void render(DrawContext drawContext, int mouseX, int mouseY, float delta) {
         // Temperature view: pull server-authoritative value periodically
-        if (showTemperature) {
+        if (xyz.srgnis.bodyhealthsystem.config.Config.enableTemperatureSystem && showTemperature) {
             long now = System.nanoTime();
             // consume last known value from networking map
             LivingEntity target = handler.getEntity();
@@ -287,7 +287,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         var tr = MinecraftClient.getInstance().textRenderer;
         int white = 0xFFFFFF;
 
-        if (showTemperature) {
+        if (xyz.srgnis.bodyhealthsystem.config.Config.enableTemperatureSystem && showTemperature) {
             String tempStr = String.format("%.1f°C", bodyTempC);
             int textW = tr.getWidth(tempStr);
             // Center roughly over torso

@@ -59,6 +59,9 @@
 
   "bodyhealthsystem.midnightconfig.drowningDamage": "Drowning damage",
 
+  "bodyhealthsystem.midnightconfig.comment_temperature": "Temperature System",
+  "bodyhealthsystem.midnightconfig.enableTemperatureSystem": "Enable Temperature System",
+
   "bodyhealthsystem.midnightconfig.comment_maxHealth": "Max Health",
   "bodyhealthsystem.midnightconfig.comment_armorMult": "Armor Multipliers",
   "bodyhealthsystem.midnightconfig.comment_armorOffset": "Armor Offsets",
