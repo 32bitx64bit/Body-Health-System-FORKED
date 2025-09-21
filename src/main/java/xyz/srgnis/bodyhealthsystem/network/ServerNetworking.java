@@ -7,6 +7,8 @@ import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PlayerLookup;
+import net.fabricmc.fabric.api.networking.v1.ServerLoginConnectionEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerLoginNetworking;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -14,10 +16,12 @@ import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
+import xyz.srgnis.bodyhealthsystem.config.Config;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
 
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
@@ -27,6 +31,26 @@ import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
 public class ServerNetworking {
 
     public static void initialize(){
+        // Login-time config handshake: send required temperature setting and verify client supports it
+        ServerLoginConnectionEvents.QUERY_START.register((handler, server, sender, synchronizer) -> {
+            PacketByteBuf cfg = PacketByteBufs.create();
+            cfg.writeBoolean(Config.enableTemperatureSystem);
+            sender.sendPacket(id("temp_cfg"), cfg);
+        });
+        ServerLoginNetworking.registerGlobalReceiver(id("temp_cfg"), (server, handler, understood, buf, synchronizer, responseSender) -> {
+            if (!understood) {
+                // Old client without our handshake; if server requires temperature, refuse join
+                if (Config.enableTemperatureSystem) {
+                    handler.disconnect(Text.literal("This server requires Body Health System with temperature sync support. Please update your client mod."));
+                }
+                return;
+            }
+            boolean clientEnabled = buf.readBoolean();
+            if (Config.enableTemperatureSystem && !clientEnabled) {
+                handler.disconnect(Text.literal("This server requires the temperature system to be enabled in Body Health System config."));
+            }
+        });
+
         ServerPlayConnectionEvents.JOIN.register(ServerNetworking::syncBody);
         ServerPlayNetworking.registerGlobalReceiver(BHSMain.MOD_IDENTIFIER, ServerNetworking::handleUseHealingItem);
         ServerPlayNetworking.registerGlobalReceiver(id("data_request"), ServerNetworking::syncBody);

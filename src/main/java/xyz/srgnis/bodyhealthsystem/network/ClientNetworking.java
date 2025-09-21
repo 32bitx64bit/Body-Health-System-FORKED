@@ -1,5 +1,6 @@
 package xyz.srgnis.bodyhealthsystem.network;
 
+import net.fabricmc.fabric.api.client.networking.v1.ClientLoginNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
@@ -12,8 +13,11 @@ import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.Identifier;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
+import xyz.srgnis.bodyhealthsystem.config.Config;
+import xyz.srgnis.bodyhealthsystem.config.MidnightConfig;
 
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
@@ -24,6 +28,18 @@ public class ClientNetworking {
     private static final Map<Integer, Double> LAST_BODY_TEMP_C = new ConcurrentHashMap<>();
 
     public static void initialize(){
+        // Login-time config sync: server tells us if temperature system is required/enabled.
+        ClientLoginNetworking.registerGlobalReceiver(id("temp_cfg"), (client, handler, buf, responseSender) -> {
+            boolean serverEnabled = buf.readBoolean();
+            // Mirror server setting clientside so UI/logic stays consistent
+            Config.enableTemperatureSystem = serverEnabled;
+            // Persist to disk so future sessions match the server automatically
+            try { MidnightConfig.write(BHSMain.MOD_ID); } catch (Throwable ignored) {}
+            PacketByteBuf reply = PacketByteBufs.create();
+            reply.writeBoolean(Config.enableTemperatureSystem);
+            return CompletableFuture.completedFuture(reply);
+        });
+
         ClientPlayNetworking.registerGlobalReceiver(BHSMain.MOD_IDENTIFIER, ClientNetworking::handleHealthChange);
         ClientPlayNetworking.registerGlobalReceiver(id("data_request"), ClientNetworking::updateEntity);
         ClientPlayNetworking.registerGlobalReceiver(id("temp_sync"), (client, handler, buf, sender) -> {
