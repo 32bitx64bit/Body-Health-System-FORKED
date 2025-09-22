@@ -30,4 +30,4 @@ And thanks to @SrGnis for making the original mod.
 
 Add a wiki.
 
-Add items for the new temperature API, Armors, blocked, etc to help players resist the cold / heat before the 0.5 release.
+Add items for the new temperature API, Armors, blocks (Like air conditioning), etc to help players resist the cold / heat before the 0.5 release.
