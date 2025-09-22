@@ -25,7 +25,11 @@ import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
 
 // TemperatureAPI: block-based thermal effects
 import gavinx.temperatureapi.api.BlockThermalAPI;
+import gavinx.temperatureapi.api.TemperatureResistanceAPI;
 import net.minecraft.block.Blocks;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.item.ArmorItem;
+import net.minecraft.item.ArmorMaterials;
 import net.minecraft.state.property.Properties;
 
 import static net.minecraft.client.util.InputUtil.GLFW_CURSOR;
@@ -65,6 +69,23 @@ public class BHSMain implements ModInitializer {
 					BlockThermalAPI.FalloffCurve.COSINE
 			);
 		}, 5);
+
+		// TemperatureResistanceAPI: give leather armor pieces Cold Resistance Tier 3 each
+		TemperatureResistanceAPI.registerProvider(player -> {
+			if (player == null) return null;
+			double cold = 0.0;
+			var head = player.getEquippedStack(EquipmentSlot.HEAD);
+			var chest = player.getEquippedStack(EquipmentSlot.CHEST);
+			var legs = player.getEquippedStack(EquipmentSlot.LEGS);
+			var feet = player.getEquippedStack(EquipmentSlot.FEET);
+			for (var stack : new net.minecraft.item.ItemStack[]{head, chest, legs, feet}) {
+				if (stack != null && !stack.isEmpty() && stack.getItem() instanceof ArmorItem armor && armor.getMaterial() == ArmorMaterials.LEATHER) {
+					cold += TemperatureResistanceAPI.tierToDegrees(-2); // Tier 2 cold per leather piece
+				}
+			}
+			if (cold <= 0.0) return null;
+			return new TemperatureResistanceAPI.Resistance(0.0, cold);
+		});
 
 		// If configured, force the actual game rule to false on server start
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
