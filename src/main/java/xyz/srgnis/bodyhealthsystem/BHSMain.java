@@ -23,6 +23,11 @@ import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
 import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
 
+// TemperatureAPI: block-based thermal effects
+import gavinx.temperatureapi.api.BlockThermalAPI;
+import net.minecraft.block.Blocks;
+import net.minecraft.state.property.Properties;
+
 import static net.minecraft.client.util.InputUtil.GLFW_CURSOR;
 import static net.minecraft.client.util.InputUtil.GLFW_CURSOR_NORMAL;
 
@@ -47,6 +52,19 @@ public class BHSMain implements ModInitializer {
 		ModItems.registerItems();
 		ModStatusEffects.registerStatusEffects();
 		Config.init(MOD_ID, Config.class);
+
+		// Register a warming effect for lit campfires: +5°C within 5 blocks
+		// Use FLOOD_FILL occlusion and dropoff (7)
+		BlockThermalAPI.register((world, pos, state) -> {
+			if (!state.isOf(Blocks.CAMPFIRE)) return null; // only vanilla campfire
+			if (!state.contains(Properties.LIT) || !state.get(Properties.LIT)) return null; // only when lit
+			return new BlockThermalAPI.ThermalSource(
+					5.0, 5,
+					BlockThermalAPI.OcclusionMode.FLOOD_FILL,
+					7, 
+					BlockThermalAPI.FalloffCurve.COSINE
+			);
+		}, 5);
 
 		// If configured, force the actual game rule to false on server start
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
