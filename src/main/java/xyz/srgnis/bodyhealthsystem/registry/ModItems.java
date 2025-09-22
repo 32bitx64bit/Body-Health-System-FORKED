@@ -16,6 +16,7 @@ import xyz.srgnis.bodyhealthsystem.items.AnkleBraceItem;
 import xyz.srgnis.bodyhealthsystem.items.ChestBraceItem;
 import xyz.srgnis.bodyhealthsystem.items.UpgradedMedkitItem;
 import xyz.srgnis.bodyhealthsystem.items.TraumaKitItem;
+import xyz.srgnis.bodyhealthsystem.items.WoolClothingItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -27,6 +28,10 @@ public class ModItems {
     public static final Item CHEST_BRACE_ITEM = new ChestBraceItem(new FabricItemSettings());
     public static final Item UPGRADED_MEDKIT_ITEM = new UpgradedMedkitItem(new FabricItemSettings());
     public static final Item TRAUMA_KIT_ITEM = new TraumaKitItem(new FabricItemSettings());
+    public static final Item WOOL_HELMET = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.HELMET, new FabricItemSettings());
+    public static final Item WOOL_CHESTPLATE = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.CHESTPLATE, new FabricItemSettings());
+    public static final Item WOOL_LEGGINGS = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.LEGGINGS, new FabricItemSettings());
+    public static final Item WOOL_BOOTS = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.BOOTS, new FabricItemSettings());
 
     public static void registerItems(){
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "plaster"), PLASTER_ITEM);
@@ -38,6 +43,10 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"chest_brace"), CHEST_BRACE_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"medkit_upgraded"), UPGRADED_MEDKIT_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"trauma_kit"), TRAUMA_KIT_ITEM);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_helmet"), WOOL_HELMET);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_chestplate"), WOOL_CHESTPLATE);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_leggings"), WOOL_LEGGINGS);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_boots"), WOOL_BOOTS);
 
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(PLASTER_ITEM);
@@ -65,6 +74,12 @@ public class ModItems {
         });
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(TRAUMA_KIT_ITEM);
+        });
+        ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
+            content.add(WOOL_HELMET);
+            content.add(WOOL_CHESTPLATE);
+            content.add(WOOL_LEGGINGS);
+            content.add(WOOL_BOOTS);
         });
     }
 }

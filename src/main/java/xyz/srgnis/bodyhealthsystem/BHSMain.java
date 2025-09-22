@@ -31,6 +31,7 @@ import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.item.ArmorItem;
 import net.minecraft.item.ArmorMaterials;
 import net.minecraft.state.property.Properties;
+import xyz.srgnis.bodyhealthsystem.items.WoolClothingItem;
 
 import static net.minecraft.client.util.InputUtil.GLFW_CURSOR;
 import static net.minecraft.client.util.InputUtil.GLFW_CURSOR_NORMAL;
@@ -70,7 +71,9 @@ public class BHSMain implements ModInitializer {
 			);
 		}, 5);
 
-		// TemperatureResistanceAPI: give leather armor pieces Cold Resistance Tier 3 each
+		// TemperatureResistanceAPI provider:
+		// - Wool Clothing piece grants Cold Resistance Tier 3 (-3)
+		// - Other leather armor pieces grant Cold Resistance Tier 2 (-2)
 		TemperatureResistanceAPI.registerProvider(player -> {
 			if (player == null) return null;
 			double cold = 0.0;
@@ -79,8 +82,13 @@ public class BHSMain implements ModInitializer {
 			var legs = player.getEquippedStack(EquipmentSlot.LEGS);
 			var feet = player.getEquippedStack(EquipmentSlot.FEET);
 			for (var stack : new net.minecraft.item.ItemStack[]{head, chest, legs, feet}) {
-				if (stack != null && !stack.isEmpty() && stack.getItem() instanceof ArmorItem armor && armor.getMaterial() == ArmorMaterials.LEATHER) {
-					cold += TemperatureResistanceAPI.tierToDegrees(-2); // Tier 2 cold per leather piece
+				if (stack == null || stack.isEmpty()) continue;
+				if (stack.getItem() instanceof WoolClothingItem) {
+					cold += TemperatureResistanceAPI.tierToDegrees(-3); // Tier 3 cold for the wool clothing
+					continue;
+				}
+				if (stack.getItem() instanceof ArmorItem armor && armor.getMaterial() == ArmorMaterials.LEATHER) {
+					cold += TemperatureResistanceAPI.tierToDegrees(-2); // Tier 2 cold per other leather piece
 				}
 			}
 			if (cold <= 0.0) return null;

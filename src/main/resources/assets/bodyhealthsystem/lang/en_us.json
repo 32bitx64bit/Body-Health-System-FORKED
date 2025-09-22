@@ -88,6 +88,18 @@
 
   "effect.bodyhealthsystem.heatstrokeinit": "Heat Stroke (Initial)",
   "effect.bodyhealthsystem.heatstrokemod": "Heat Stroke (Moderate)",
-  "effect.bodyhealthsystem.heatstrokeserv": "Heat Stroke (Severe)"
-  
+  "effect.bodyhealthsystem.heatstrokeserv": "Heat Stroke (Severe)",
+
+  "item.bodyhealthsystem.wool_helmet": "Wool Hood",
+  "item.bodyhealthsystem.wool_chestplate": "Wool Tunic",
+  "item.bodyhealthsystem.wool_leggings": "Wool Pants",
+  "item.bodyhealthsystem.wool_boots": "Wool Boots",
+
+  "tooltip.bodyhealthsystem.temp_resistance_tier": "Cold Resistance : %s",
+
+  "bodyhealthsystem.group.general": "BHSF Items",
+
+  "tooltip.bodyhealthsystem.temp_resistance_label": "%s Resistance %s",
+  "label.bodyhealthsystem.cold": "Cold",
+  "label.bodyhealthsystem.heat": "Heat"
 }

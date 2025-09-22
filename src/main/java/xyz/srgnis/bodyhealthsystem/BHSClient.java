@@ -28,7 +28,7 @@ public class BHSClient implements ClientModInitializer {
         // Tooltip: show cold resistance tier on leather armor pieces
         ItemTooltipCallback.EVENT.register((stack, context, lines) -> {
             if (stack.getItem() instanceof ArmorItem armor && armor.getMaterial() == ArmorMaterials.LEATHER) {
-                Text line = Text.literal("Cold resistance : Tier 3")
+                Text line = Text.literal("Cold resistance 2")
                         .setStyle(Style.EMPTY.withColor(TextColor.fromRgb(0x4da1ff)));
                 lines.add(line);
             }
