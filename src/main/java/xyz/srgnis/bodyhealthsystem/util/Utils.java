@@ -2,6 +2,7 @@ package xyz.srgnis.bodyhealthsystem.util;
 
 import net.minecraft.item.ArmorItem;
 import xyz.srgnis.bodyhealthsystem.config.Config;
+import xyz.srgnis.bodyhealthsystem.items.StrawHatItem;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,6 +41,9 @@ public class Utils {
     }
 
     public static float modifyProtection(ArmorItem armorItem, int slot){
+        if (armorItem instanceof StrawHatItem && slot == HELMET) {
+            return 1.5f;
+        }
         float armor = armorItem.getProtection();
         switch (slot){
             case HELMET:

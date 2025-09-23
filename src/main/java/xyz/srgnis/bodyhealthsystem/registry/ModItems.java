@@ -17,6 +17,7 @@ import xyz.srgnis.bodyhealthsystem.items.ChestBraceItem;
 import xyz.srgnis.bodyhealthsystem.items.UpgradedMedkitItem;
 import xyz.srgnis.bodyhealthsystem.items.TraumaKitItem;
 import xyz.srgnis.bodyhealthsystem.items.WoolClothingItem;
+import xyz.srgnis.bodyhealthsystem.items.StrawHatItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -33,6 +34,8 @@ public class ModItems {
     public static final Item WOOL_LEGGINGS = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.LEGGINGS, new FabricItemSettings());
     public static final Item WOOL_BOOTS = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.BOOTS, new FabricItemSettings());
 
+    public static final Item STRAW_HAT = new StrawHatItem(new FabricItemSettings());
+
     public static void registerItems(){
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "plaster"), PLASTER_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "morphine"), MORPHINE_ITEM);
@@ -47,6 +50,7 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_chestplate"), WOOL_CHESTPLATE);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_leggings"), WOOL_LEGGINGS);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_boots"), WOOL_BOOTS);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"straw_hat"), STRAW_HAT);
 
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(PLASTER_ITEM);
@@ -80,6 +84,7 @@ public class ModItems {
             content.add(WOOL_CHESTPLATE);
             content.add(WOOL_LEGGINGS);
             content.add(WOOL_BOOTS);
+            content.add(STRAW_HAT);
         });
     }
 }
