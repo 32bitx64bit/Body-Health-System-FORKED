@@ -22,6 +22,8 @@ import org.jetbrains.annotations.Nullable;
 import xyz.srgnis.bodyhealthsystem.registry.ModBlocks;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.ItemScatterer;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.util.math.random.Random;
 
 public class AirConditionerBlock extends BlockWithEntity {
     public static final DirectionProperty FACING = Properties.HORIZONTAL_FACING;
@@ -95,5 +97,43 @@ public class AirConditionerBlock extends BlockWithEntity {
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(World world, BlockState state, BlockEntityType<T> type) {
         if (world.isClient) return null;
         return checkType(type, ModBlocks.AIR_CONDITIONER_BE, AirConditionerBlockEntity::serverTick);
+    }
+
+    @Override
+    public void randomDisplayTick(BlockState state, World world, BlockPos pos, Random random) {
+        if (!state.get(LIT)) return;
+        Direction facing = state.get(FACING);
+
+        // spawn 0-2 particles per tick on average
+        int count = random.nextBetween(0, 2);
+        for (int i = 0; i < count; i++) {
+            double baseX = pos.getX() + 0.5;
+            double baseY = pos.getY() + 0.5 + (random.nextDouble() * 0.4 - 0.2); // around center
+            double baseZ = pos.getZ() + 0.5;
+
+            // Offset slightly outside the front face (similar to furnace smoke offset)
+            double faceOut = 0.52;
+            double lateral = random.nextDouble() * 0.6 - 0.3; // across the front face
+
+            double x = baseX + facing.getOffsetX() * faceOut;
+            double y = baseY;
+            double z = baseZ + facing.getOffsetZ() * faceOut;
+            if (facing.getAxis() == Direction.Axis.X) {
+                z += lateral;
+            } else {
+                x += lateral;
+            }
+
+
+
+            // Slightly stronger outward velocity so flakes push outwards a bit more (~1–1.5 blocks)
+            double speed = 0.10 + random.nextDouble() * 0.06;
+            double vx = facing.getOffsetX() * speed;
+
+            double vy = random.nextDouble() * 0.02 - 0.01; // small vertical drift
+            double vz = facing.getOffsetZ() * speed;
+
+            world.addParticle(ParticleTypes.SNOWFLAKE, x, y, z, vx, vy, vz);
+        }
     }
 }
