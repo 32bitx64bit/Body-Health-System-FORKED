@@ -16,9 +16,9 @@
   "effect.bodyhealthsystem.adrenaline_effect": "Adrenaline",
   "effect.bodyhealthsystem.dressing_effect": "Dressing Applied",
   "effect.bodyhealthsystem.bleeding_effect": "Bleeding",
-  "effect.bodyhealthsystem.mildhypo": "Mild Hypothermia",
-  "effect.bodyhealthsystem.modhypo": "Moderate Hypothermia",
-  "effect.bodyhealthsystem.servhypo": "Severe Hypothermia",
+  "effect.bodyhealthsystem.mildhypo": "Hypothermia",
+  "effect.bodyhealthsystem.modhypo": "Hypothermia",
+  "effect.bodyhealthsystem.servhypo": "Hypothermia",
 
   "bodyhealthsystem.midnightconfig.title": "Body Health System",
 
@@ -87,9 +87,9 @@
   "key.bodyhealthsystem.open_health": "Open Health Screen",
   "category.bodyhealthsystem": "Body Health System",
 
-  "effect.bodyhealthsystem.heatstrokeinit": "Heat Stroke (Initial)",
-  "effect.bodyhealthsystem.heatstrokemod": "Heat Stroke (Moderate)",
-  "effect.bodyhealthsystem.heatstrokeserv": "Heat Stroke (Severe)",
+  "effect.bodyhealthsystem.heatstrokeinit": "Heat Stroke",
+  "effect.bodyhealthsystem.heatstrokemod": "Heat Stroke",
+  "effect.bodyhealthsystem.heatstrokeserv": "Heat Stroke",
 
   "item.bodyhealthsystem.wool_helmet": "Wool Hood",
   "item.bodyhealthsystem.wool_chestplate": "Wool Tunic",
