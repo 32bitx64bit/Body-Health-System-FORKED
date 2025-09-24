@@ -23,7 +23,8 @@
     "InventoryScreenHudMixin",
     "HandledScreenAccessor",
     "BlockInventoryWhileDownedMixin",
-    "InventoryStatusEffectFilterMixin"
+    "InventoryStatusEffectFilterMixin",
+    "InventoryStatusTextScaleMixin"
   ],
   "injectors": {
     "defaultRequire": 1
