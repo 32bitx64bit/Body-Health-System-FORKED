@@ -33,7 +33,7 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
 	// Temperature API (fetched from GitHub Releases via Ivy)
-	modImplementation "temperatureapi:temperatureapi:1.0.9@jar"
+	modImplementation "temperatureapi:temperatureapi:1.1.0@jar"
 
 	// Mixin Extras: depend at dev/runtime, but DO NOT jar-in-jar to avoid version clashes in modpacks
 	// Let the modpack provide a single version (e.g. 0.5.0). This keeps us compatible with newer Fabric API modules

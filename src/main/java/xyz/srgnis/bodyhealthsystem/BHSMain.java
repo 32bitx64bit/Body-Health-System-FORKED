@@ -22,6 +22,7 @@ import xyz.srgnis.bodyhealthsystem.network.ServerNetworking;
 import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
 import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
+import xyz.srgnis.bodyhealthsystem.registry.ModBlocks;
 
 // TemperatureAPI: block-based thermal effects
 import gavinx.temperatureapi.api.BlockThermalAPI;
@@ -33,6 +34,7 @@ import net.minecraft.item.ArmorMaterials;
 import net.minecraft.state.property.Properties;
 import xyz.srgnis.bodyhealthsystem.items.WoolClothingItem;
 import xyz.srgnis.bodyhealthsystem.items.StrawHatItem;
+import net.minecraft.util.math.Direction;
 
 import static net.minecraft.client.util.InputUtil.GLFW_CURSOR;
 import static net.minecraft.client.util.InputUtil.GLFW_CURSOR_NORMAL;
@@ -56,6 +58,7 @@ public class BHSMain implements ModInitializer {
 		ServerNetworking.initialize();
 		DevCommands.initialize();
 		ModItems.registerItems();
+		ModBlocks.registerBlocks();
 		ModStatusEffects.registerStatusEffects();
 		Config.init(MOD_ID, Config.class);
 
@@ -108,6 +111,24 @@ public class BHSMain implements ModInitializer {
 		});
 
 		ScreenHandlers.registerScreenHandlers();
+
+		// Register AC dynamic thermal provider once; source active only while burning coolant
+		BlockThermalAPI.register((world, pos, state) -> {
+			if (!state.isOf(ModBlocks.AIR_CONDITIONER)) return null;
+			var be = world.getBlockEntity(pos);
+			if (!(be instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlockEntity ac)) return null;
+			// active when burning coolant
+			if (ac.getBurnTime() <= 0) return null;
+			// Emit only out of the block's front face (its horizontal FACING)
+			net.minecraft.util.math.Direction face = state.get(net.minecraft.state.property.Properties.HORIZONTAL_FACING);
+			return new BlockThermalAPI.ThermalSource(
+					-6.0, 8,
+					BlockThermalAPI.OcclusionMode.FLOOD_FILL,
+					7,
+					BlockThermalAPI.FalloffCurve.COSINE,
+					face
+			);
+		}, 15);
 	}
 
 	public static boolean debuggerReleaseControl() {

@@ -103,5 +103,6 @@
   "tooltip.bodyhealthsystem.temp_resistance_label": "%s Resistance %s",
   "label.bodyhealthsystem.cold": "Cold",
   "label.bodyhealthsystem.heat": "Heat",
-  "tooltip.bodyhealthsystem.straw_hat": "A cool-looking straw hat."
+  "tooltip.bodyhealthsystem.straw_hat": "A cool-looking straw hat.",
+  "block.bodyhealthsystem.air_conditioner": "Air Conditioner"
 }
