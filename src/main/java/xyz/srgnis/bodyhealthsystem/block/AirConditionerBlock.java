@@ -124,12 +124,9 @@ public class AirConditionerBlock extends BlockWithEntity {
                 x += lateral;
             }
 
-
-
             // Slightly stronger outward velocity so flakes push outwards a bit more (~1–1.5 blocks)
             double speed = 0.10 + random.nextDouble() * 0.06;
             double vx = facing.getOffsetX() * speed;
-
             double vy = random.nextDouble() * 0.02 - 0.01; // small vertical drift
             double vz = facing.getOffsetZ() * speed;
 
