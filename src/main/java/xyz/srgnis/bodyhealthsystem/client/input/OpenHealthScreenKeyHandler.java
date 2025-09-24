@@ -17,7 +17,7 @@ public final class OpenHealthScreenKeyHandler {
         OPEN_HEALTH_KEY = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.bodyhealthsystem.open_health", // translation key
                 InputUtil.Type.KEYSYM,
-                GLFW.GLFW_KEY_R, // default 'R'
+                GLFW.GLFW_KEY_F, // default 'F'
                 "category.bodyhealthsystem" // category
         ));
 

@@ -407,8 +407,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        // Allow the same keybind (R) to close the GUI when it is open
-        if (keyCode == GLFW.GLFW_KEY_R) {
+        // Allow the same keybind (F) to close the GUI when it is open
+        if (keyCode == GLFW.GLFW_KEY_F) {
             this.close();
             return true;
         }
