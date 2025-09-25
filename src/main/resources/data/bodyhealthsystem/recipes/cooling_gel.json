@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:slime_ball" },
+    { "item": "minecraft:snowball" }
+  ],
+  "result": { "item": "bodyhealthsystem:cooling_gel", "count": 2 }
+}

@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:slime_ball" },
+    { "item": "minecraft:magma_cream" }
+  ],
+  "result": { "item": "bodyhealthsystem:heating_gel", "count": 2 }
+}

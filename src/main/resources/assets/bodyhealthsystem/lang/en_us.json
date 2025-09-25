@@ -9,6 +9,8 @@
   "item.bodyhealthsystem.chest_brace": "Chest Brace",
   "item.bodyhealthsystem.trauma_kit": "Trauma Kit",
   "item.bodyhealthsystem.straw_hat": "Straw Hat",
+  "item.bodyhealthsystem.cooling_gel": "Cooling Gel",
+  "item.bodyhealthsystem.heating_gel": "Heating Gel",
 
   "itemGroup.bodyhealthsystem.general": "Body Health System",
 
@@ -96,13 +98,14 @@
   "item.bodyhealthsystem.wool_leggings": "Wool Pants",
   "item.bodyhealthsystem.wool_boots": "Wool Boots",
 
-  "tooltip.bodyhealthsystem.temp_resistance_tier": "Cold Resistance : %s",
 
   "bodyhealthsystem.group.general": "BHSF Items",
 
-  "tooltip.bodyhealthsystem.temp_resistance_label": "%s Resistance %s",
-  "label.bodyhealthsystem.cold": "Cold",
-  "label.bodyhealthsystem.heat": "Heat",
   "tooltip.bodyhealthsystem.straw_hat": "A cool-looking straw hat.",
-  "block.bodyhealthsystem.air_conditioner": "Air Conditioner"
+  "block.bodyhealthsystem.air_conditioner": "Air Conditioner",
+
+  "message.bodyhealthsystem.cooling_gel.applied": "Applied +1 cold resistance tier to armor.",
+  "message.bodyhealthsystem.cooling_gel.max": "Armor is already at max cold resistance.",
+  "message.bodyhealthsystem.heating_gel.applied": "Applied +1 heat resistance tier to armor.",
+  "message.bodyhealthsystem.heating_gel.max": "Armor is already at max heat resistance."
 }

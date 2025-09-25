@@ -18,6 +18,8 @@ import xyz.srgnis.bodyhealthsystem.items.UpgradedMedkitItem;
 import xyz.srgnis.bodyhealthsystem.items.TraumaKitItem;
 import xyz.srgnis.bodyhealthsystem.items.WoolClothingItem;
 import xyz.srgnis.bodyhealthsystem.items.StrawHatItem;
+import xyz.srgnis.bodyhealthsystem.items.CoolingGelItem;
+import xyz.srgnis.bodyhealthsystem.items.HeatingGelItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -36,6 +38,9 @@ public class ModItems {
 
     public static final Item STRAW_HAT = new StrawHatItem(new FabricItemSettings());
 
+    public static final Item COOLING_GEL = new CoolingGelItem(new FabricItemSettings().maxCount(16));
+    public static final Item HEATING_GEL = new HeatingGelItem(new FabricItemSettings().maxCount(16));
+
     public static void registerItems(){
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "plaster"), PLASTER_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "morphine"), MORPHINE_ITEM);
@@ -51,6 +56,8 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_leggings"), WOOL_LEGGINGS);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_boots"), WOOL_BOOTS);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"straw_hat"), STRAW_HAT);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"cooling_gel"), COOLING_GEL);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"heating_gel"), HEATING_GEL);
 
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(PLASTER_ITEM);
@@ -85,6 +92,8 @@ public class ModItems {
             content.add(WOOL_LEGGINGS);
             content.add(WOOL_BOOTS);
             content.add(STRAW_HAT);
+            content.add(COOLING_GEL);
+            content.add(HEATING_GEL);
         });
     }
 }

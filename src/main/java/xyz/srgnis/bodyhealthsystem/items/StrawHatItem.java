@@ -2,18 +2,19 @@ package xyz.srgnis.bodyhealthsystem.items;
 
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.Multimap;
-import net.minecraft.client.item.TooltipContext;
+
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.attribute.EntityAttribute;
 import net.minecraft.entity.attribute.EntityAttributeModifier;
 import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ArmorItem;
 import net.minecraft.item.ItemStack;
-import net.minecraft.text.Text;
-import net.minecraft.world.World;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
+import net.minecraft.world.World;
+
+
+
 import java.util.UUID;
 
 public class StrawHatItem extends ArmorItem {
@@ -22,7 +23,7 @@ public class StrawHatItem extends ArmorItem {
 
     // Desired stats
     private static final double ARMOR_POINTS = 1.5; // armor value
-    private static final int HEAT_RESISTANCE_TIER = 3; // for tooltip only in this project
+    private static final int DEFAULT_HEAT_TIER = 3; // +6°C heat comfort
 
     private final Multimap<EntityAttribute, EntityAttributeModifier> attributeModifiers;
 
@@ -45,13 +46,22 @@ public class StrawHatItem extends ArmorItem {
     }
 
     @Override
-    public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
-        super.appendTooltip(stack, world, tooltip, context);
-        // Reuse existing translatable strings pattern used by wool clothing
-        tooltip.add(Text.translatable(
-                "tooltip.bodyhealthsystem.temp_resistance_label",
-                Text.translatable("label.bodyhealthsystem.heat"),
-                HEAT_RESISTANCE_TIER
-        ));
+    public ItemStack getDefaultStack() {
+        ItemStack stack = super.getDefaultStack();
+        int[] tiers = ResistanceUtil.readTiers(stack);
+        if (tiers[0] <= 0) {
+            ResistanceUtil.writeTiers(stack, DEFAULT_HEAT_TIER, tiers[1]);
+        }
+        return stack;
     }
+
+    @Override
+    public void onCraft(ItemStack stack, World world, PlayerEntity player) {
+        super.onCraft(stack, world, player);
+        int[] tiers = ResistanceUtil.readTiers(stack);
+        if (tiers[0] <= 0) {
+            ResistanceUtil.writeTiers(stack, DEFAULT_HEAT_TIER, tiers[1]);
+        }
+    }
+
 }

@@ -17,7 +17,9 @@
     "ProjectileHitMixin",
     "PreventJumpWhenDownedMixin",
     "OnDeathMixin",
-    "ForcePoseMixin"
+    "ForcePoseMixin",
+    "AnvilApplyGelMixin",
+    "DisableDefaultAnvilResultMixin"
   ],
   "client": [
     "InventoryScreenHudMixin",
