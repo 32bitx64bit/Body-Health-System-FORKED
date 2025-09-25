@@ -1,8 +1,14 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "ingredients": [
-    { "item": "minecraft:slime_ball" },
-    { "item": "minecraft:snowball" }
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ISI",
+    "SNS",
+    "ISI"
   ],
-  "result": { "item": "bodyhealthsystem:cooling_gel", "count": 2 }
+  "key": {
+    "S": { "item": "minecraft:slime_ball" },
+    "I": { "item": "minecraft:snowball" },
+    "N": { "item": "minecraft:nether_star" }
+  },
+  "result": { "item": "bodyhealthsystem:cooling_gel", "count": 4 }
 }
