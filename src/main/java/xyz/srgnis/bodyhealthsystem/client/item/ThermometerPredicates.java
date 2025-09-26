@@ -20,6 +20,8 @@ import xyz.srgnis.bodyhealthsystem.registry.ModItems;
  *  4: [22, 30]
  *  5: (30, 38)
  *  6: >= 38
+ *
+ * Returns a normalized float [0.0 .. 1.0] so JSON overrides can match properly.
  */
 public final class ThermometerPredicates {
     private ThermometerPredicates() {}
@@ -34,15 +36,20 @@ public final class ThermometerPredicates {
 
     private static float calc(ItemStack stack, net.minecraft.client.world.ClientWorld world, LivingEntity entity, int seed) {
         PlayerEntity player = entity instanceof PlayerEntity p ? p : MinecraftClient.getInstance().player;
-        if (player == null) return 0f;
+        if (player == null) return 0.5f; // default to mid band if no player
         double c = TemperatureAPI.getTemperatureCelsius(player);
-        if (Double.isNaN(c)) return 0f;
-        if (c < -10.0) return 0f;
-        if (c < 0.0) return 1f;
-        if (c < 13.0) return 2f;
-        if (c < 22.0) return 3f;
-        if (c <= 30.0) return 4f; // safe band upper bound
-        if (c < 38.0) return 5f;
-        return 6f;
+        if (Double.isNaN(c)) return 0.5f; // default to mid band on error
+
+        int stage;
+        if (c < -10.0) stage = 0;
+        else if (c < 0.0) stage = 1;
+        else if (c < 13.0) stage = 2;
+        else if (c <= 30.0) stage = 3;
+        else if (c < 34.0) stage = 4;
+        else if (c < 38.0) stage = 5;
+        else stage = 6;
+
+        // normalize: stage / 6 → [0.0, 1.0]
+        return stage / 6.0f;
     }
 }
