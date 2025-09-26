@@ -1,0 +1,12 @@
+{
+  "predicate_type": "temperature_stage",
+  "stages": [
+    { "max": -10.0, "custom_model_data": 0 },
+    { "max": 0.0,   "custom_model_data": 1 },
+    { "max": 13.0,  "custom_model_data": 2 },
+    { "max": 22.0,  "custom_model_data": 3 },
+    { "max": 30.0,  "custom_model_data": 4 },
+    { "max": 38.0,  "custom_model_data": 5 },
+    { "max": 999.0, "custom_model_data": 6 }
+  ]
+}

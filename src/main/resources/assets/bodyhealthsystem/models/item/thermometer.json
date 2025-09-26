@@ -1,0 +1,15 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "bodyhealthsystem:item/thermometer_0"
+  },
+  "overrides": [
+    { "predicate": {"bodyhealthsystem:temperature_stage": 0.0}, "model": "bodyhealthsystem:item/thermometer_0" },
+    { "predicate": {"bodyhealthsystem:temperature_stage": 1.0}, "model": "bodyhealthsystem:item/thermometer_1" },
+    { "predicate": {"bodyhealthsystem:temperature_stage": 2.0}, "model": "bodyhealthsystem:item/thermometer_2" },
+    { "predicate": {"bodyhealthsystem:temperature_stage": 3.0}, "model": "bodyhealthsystem:item/thermometer_3" },
+    { "predicate": {"bodyhealthsystem:temperature_stage": 4.0}, "model": "bodyhealthsystem:item/thermometer_4" },
+    { "predicate": {"bodyhealthsystem:temperature_stage": 5.0}, "model": "bodyhealthsystem:item/thermometer_5" },
+    { "predicate": {"bodyhealthsystem:temperature_stage": 6.0}, "model": "bodyhealthsystem:item/thermometer_6" }
+  ]
+}

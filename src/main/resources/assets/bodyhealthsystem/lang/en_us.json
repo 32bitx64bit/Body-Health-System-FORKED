@@ -110,6 +110,7 @@
   "message.bodyhealthsystem.cooling_gel.max": "Armor is already at max cold resistance.",
   "message.bodyhealthsystem.heating_gel.applied": "Applied +1 heat resistance tier to armor.",
   "message.bodyhealthsystem.heating_gel.max": "Armor is already at max heat resistance.",
+  "item.bodyhealthsystem.thermometer": "Thermometer",
 
   "block.bodyhealthsystem.space_heater": "Space Heater",
   "screen.bodyhealthsystem.heater.mode_heater": "Power: Stable",

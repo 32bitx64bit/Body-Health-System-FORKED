@@ -13,6 +13,7 @@ import xyz.srgnis.bodyhealthsystem.client.input.OpenHealthScreenKeyHandler;
 import xyz.srgnis.bodyhealthsystem.client.model.StrawHatModel;
 import xyz.srgnis.bodyhealthsystem.client.render.StrawHatArmorRenderer;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
+import xyz.srgnis.bodyhealthsystem.client.item.ThermometerPredicates;
 
 public class BHSClient implements ClientModInitializer {
     @Override
@@ -29,5 +30,8 @@ public class BHSClient implements ClientModInitializer {
                 StrawHatModel.LAYER, StrawHatModel::getTexturedModelData
         );
         ArmorRenderer.register(new StrawHatArmorRenderer(), ModItems.STRAW_HAT);
+
+        // Item predicate for thermometer stages
+        ThermometerPredicates.init();
     }
 }
