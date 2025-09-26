@@ -18,6 +18,7 @@ import net.minecraft.server.network.ServerPlayNetworkHandler;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
@@ -75,6 +76,18 @@ public class ServerNetworking {
                 out.writeInt(entityId);
                 out.writeDouble(tempC);
                 ServerPlayNetworking.send(player, id("temp_sync"), out);
+            });
+        });
+
+        // AC mode toggle from client UI
+        ServerPlayNetworking.registerGlobalReceiver(id("ac_mode"), (server, player, handler, buf, responseSender) -> {
+            BlockPos pos = buf.readBlockPos();
+            boolean regulate = buf.readBoolean();
+            server.execute(() -> {
+                var be = player.getWorld().getBlockEntity(pos);
+                if (be instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlockEntity ac) {
+                    ac.setRegulating(regulate);
+                }
             });
         });
     }

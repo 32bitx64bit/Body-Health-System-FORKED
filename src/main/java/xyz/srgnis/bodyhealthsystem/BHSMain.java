@@ -26,6 +26,7 @@ import xyz.srgnis.bodyhealthsystem.registry.ModBlocks;
 
 // TemperatureAPI: block-based thermal effects
 import gavinx.temperatureapi.api.BlockThermalAPI;
+import gavinx.temperatureapi.api.TemperatureAPI;
 import gavinx.temperatureapi.api.TemperatureResistanceAPI;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.EquipmentSlot;
@@ -121,17 +122,31 @@ public class BHSMain implements ModInitializer {
 
 		ScreenHandlers.registerScreenHandlers();
 
-		// Register AC dynamic thermal provider once; source active only while burning coolant
+		// Register AC dynamic thermal provider once; source depends on mode
 		BlockThermalAPI.register((world, pos, state) -> {
 			if (!state.isOf(ModBlocks.AIR_CONDITIONER)) return null;
 			var be = world.getBlockEntity(pos);
 			if (!(be instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlockEntity ac)) return null;
-			// active when burning coolant
+			// Require fuel
 			if (ac.getBurnTime() <= 0) return null;
-			// Emit only out of the block's front face (its horizontal FACING)
+			// Directional emission out of the front face
 			net.minecraft.util.math.Direction face = state.get(net.minecraft.state.property.Properties.HORIZONTAL_FACING);
+
+			double deltaC;
+			if (ac.isRegulating()) {
+				// Aim for 22°C against environment to avoid feedback
+				double env = TemperatureAPI.getEnvironmentCelsius(world, pos);
+				if (Double.isNaN(env) || env <= 22.0) return null; // no cooling needed
+				double error = 22.0 - env; // negative value
+				// Clamp cooling power between -8 and -0.5
+				deltaC = Math.max(-8.0, Math.min(-0.5, error));
+			} else {
+				// Constant breeze
+				deltaC = -6.0;
+			}
+
 			return new BlockThermalAPI.ThermalSource(
-					-6.0, 8,
+					deltaC, 8,
 					BlockThermalAPI.OcclusionMode.FLOOD_FILL,
 					7,
 					BlockThermalAPI.FalloffCurve.COSINE,

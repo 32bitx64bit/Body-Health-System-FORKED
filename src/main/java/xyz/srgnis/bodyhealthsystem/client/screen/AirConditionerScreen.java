@@ -2,17 +2,43 @@ package xyz.srgnis.bodyhealthsystem.client.screen;
 
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
+import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 
 public class AirConditionerScreen extends HandledScreen<AirConditionerScreenHandler> {
     private static final Identifier TEXTURE = new Identifier("bodyhealthsystem", "textures/gui/air_conditioner.png");
+    private ButtonWidget modeButton;
+    private boolean lastRegulating;
 
     public AirConditionerScreen(AirConditionerScreenHandler handler, PlayerInventory inventory, Text title) {
         super(handler, inventory, title);
         this.backgroundWidth = 176;
         this.backgroundHeight = 166;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        int x = (this.width - this.backgroundWidth) / 2;
+        int y = (this.height - this.backgroundHeight) / 2;
+        lastRegulating = handler.isRegulating();
+        // Place a toggle button near the top-right of the GUI
+        modeButton = ButtonWidget.builder(getModeLabel(), b -> {
+            boolean newMode = !handler.isRegulating();
+            handler.setRegulating(newMode);
+            modeButton.setMessage(getModeLabel());
+            lastRegulating = newMode;
+        }).dimensions(x + 176 - 80 - 8, y + 6, 80, 20).build();
+        addDrawableChild(modeButton);
+    }
+
+    private Text getModeLabel() {
+        // Off = constant breeze (-6°C), On = hold 22°C
+        return handler.isRegulating()
+                ? Text.translatable("screen.bodyhealthsystem.ac.mode_regulate")
+                : Text.translatable("screen.bodyhealthsystem.ac.mode_breeze");
     }
 
     @Override
@@ -31,7 +57,6 @@ public class AirConditionerScreen extends HandledScreen<AirConditionerScreenHand
             int srcU = 176;
             int srcV = 1;
             int w = 13;
-            // Shift an additional 1px left (x-2 overall) from original 99,37, still down 1px
             context.drawTexture(TEXTURE, x + 99, y + 37 + (13 - h), srcU, srcV + (13 - h), w, h);
         }
     }
@@ -44,6 +69,12 @@ public class AirConditionerScreen extends HandledScreen<AirConditionerScreenHand
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        // Refresh button message if the property synced after init or changed externally
+        boolean now = handler.isRegulating();
+        if (now != lastRegulating && modeButton != null) {
+            modeButton.setMessage(getModeLabel());
+            lastRegulating = now;
+        }
         this.renderBackground(context);
         super.render(context, mouseX, mouseY, delta);
         this.drawMouseoverTooltip(context, mouseX, mouseY);
