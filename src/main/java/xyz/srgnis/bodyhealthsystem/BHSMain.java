@@ -102,6 +102,15 @@ public class BHSMain implements ModInitializer {
 			return new TemperatureResistanceAPI.Resistance(heat, cold);
 		});
 
+		// Fire Resistance -> Heat resistance tier 6 while active
+		TemperatureResistanceAPI.registerProvider(player -> {
+			if (player == null) return null;
+			if (player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.FIRE_RESISTANCE)) {
+				return new TemperatureResistanceAPI.Resistance(TemperatureResistanceAPI.tierToDegrees(6), 0.0);
+			}
+			return null;
+		});
+
 		// If configured, force the actual game rule to false on server start
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			if (Config.forceDisableVanillaRegen) {
