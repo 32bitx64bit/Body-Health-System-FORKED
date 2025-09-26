@@ -1,6 +1,5 @@
 package xyz.srgnis.bodyhealthsystem.block;
 
-import gavinx.temperatureapi.api.BlockThermalAPI;
 import gavinx.temperatureapi.api.TemperatureAPI;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntity;
@@ -21,21 +20,18 @@ import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import xyz.srgnis.bodyhealthsystem.registry.ModBlocks;
 
-public class AirConditionerBlockEntity extends BlockEntity implements net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory, net.minecraft.inventory.Inventory {
-    // Single-slot inventory for coolant (ice variants)
+public class SpaceHeaterBlockEntity extends BlockEntity implements net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory, net.minecraft.inventory.Inventory {
     private final DefaultedList<ItemStack> items = DefaultedList.ofSize(1, ItemStack.EMPTY);
 
-    private int burnTime = 0; // ticks remaining for current coolant item
-    private int burnTimeTotal = 0; // total ticks for current item (for GUI progress)
-    // Mode: false = constant breeze (-6°C), true = regulate to ~22°C using TemperatureAPI
+    private int burnTime = 0;
+    private int burnTimeTotal = 0;
     private boolean regulate = false;
-    // Fractional extra consumption accumulator when regulating in heat
     private double consumeDebt = 0.0;
 
-    public static final int SLOT_COOLANT = 0;
+    public static final int SLOT_FUEL = 0;
 
-    public AirConditionerBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlocks.AIR_CONDITIONER_BE, pos, state);
+    public SpaceHeaterBlockEntity(BlockPos pos, BlockState state) {
+        super(ModBlocks.SPACE_HEATER_BE, pos, state);
     }
 
     public int getBurnTime() { return burnTime; }
@@ -47,27 +43,24 @@ public class AirConditionerBlockEntity extends BlockEntity implements net.fabric
         return Math.min(15, (int)Math.round((burnTimeTotal == 0 ? 0.0 : (double)burnTime / burnTimeTotal) * 15.0));
     }
 
-    public static void serverTick(World world, BlockPos pos, BlockState state, AirConditionerBlockEntity be) {
+    public static void serverTick(World world, BlockPos pos, BlockState state, SpaceHeaterBlockEntity be) {
         if (world.isClient) return;
 
-        // Decide whether we want to actively cool this tick
-        boolean wantsCooling;
+        boolean wantsHeating;
         double envC = Double.NaN;
         if (!be.regulate) {
-            wantsCooling = true; // constant breeze mode
+            wantsHeating = true; // constant heater
         } else {
             envC = TemperatureAPI.getEnvironmentCelsius(world, pos);
-            wantsCooling = !Double.isNaN(envC) && envC > 22.0;
+            wantsHeating = !Double.isNaN(envC) && envC < 22.0;
         }
 
-        // Handle fuel consumption only when active and has coolant
         boolean wasLit = state.contains(net.minecraft.state.property.Properties.LIT) && state.get(net.minecraft.state.property.Properties.LIT);
 
-        if (be.burnTime <= 0 && wantsCooling) {
-            // try consume new coolant
-            ItemStack stack = be.items.get(SLOT_COOLANT);
+        if (be.burnTime <= 0 && wantsHeating) {
+            ItemStack stack = be.items.get(SLOT_FUEL);
             if (!stack.isEmpty()) {
-                int burn = getCoolantBurnTime(stack.getItem());
+                int burn = getFuelBurnTime(stack.getItem());
                 if (burn > 0) {
                     stack.decrement(1);
                     be.burnTime = burn;
@@ -76,46 +69,39 @@ public class AirConditionerBlockEntity extends BlockEntity implements net.fabric
                 }
             }
         }
-        if (be.burnTime > 0 && wantsCooling) {
-            // Base consumption is 1 tick per server tick
+        if (be.burnTime > 0 && wantsHeating) {
             int consume = 1;
-            // If regulating and it's hotter than 22°C, consume faster the hotter it is
             if (be.regulate && !Double.isNaN(envC)) {
-                double excess = Math.max(0.0, envC - 22.0);
-                if (excess > 0.0) {
-                    // Each +20°C above target roughly adds +1x consumption (rate 2.0)
-                    double rate = 1.0 + 0.05 * excess;
+                double deficit = Math.max(0.0, 22.0 - envC);
+                if (deficit > 0.0) {
+                    double rate = 1.0 + 0.05 * deficit; // further from 22 -> slightly faster fuel
                     double total = rate + be.consumeDebt;
                     int units = (int)Math.floor(total);
                     be.consumeDebt = total - units;
                     consume = Math.max(1, units);
                 }
             }
-            be.burnTime -= consume; // consume scaled by demand
+            be.burnTime -= consume;
             if (be.burnTime < 0) be.burnTime = 0;
         }
 
-        boolean isBurning = be.burnTime > 0 && wantsCooling;
+        boolean isBurning = be.burnTime > 0 && wantsHeating;
         if (wasLit != isBurning) {
-            // Update block LIT property like furnace
             if (state.contains(net.minecraft.state.property.Properties.LIT)) {
                 world.setBlockState(pos, state.with(net.minecraft.state.property.Properties.LIT, isBurning), 3);
             }
         }
     }
 
-    private static int getCoolantBurnTime(Item item) {
-        if (item == Items.ICE) return 200; // 10s
-        if (item == Items.PACKED_ICE) return 400; // 20s
-        if (item == Items.BLUE_ICE) return 1000; // 50s
-        if (item == Items.SNOWBALL) return 40; // 2s
-        if (item == Items.SNOW_BLOCK) return 300; // 15s
+    private static int getFuelBurnTime(Item item) {
+        if (item == Items.CHARCOAL) return 1600; // same as furnace
+        if (item == Items.COAL) return 1600;
+        if (item == Items.COAL_BLOCK) return 16000;
         return 0;
     }
 
     public DefaultedList<ItemStack> getItems() { return items; }
 
-    // Persistence
     @Override
     protected void writeNbt(NbtCompound nbt) {
         super.writeNbt(nbt);
@@ -135,15 +121,13 @@ public class AirConditionerBlockEntity extends BlockEntity implements net.fabric
     }
 
     public void onBroken(World world, BlockPos pos) {
-        // drop inventory
-        ItemStack stack = items.get(SLOT_COOLANT);
+        ItemStack stack = items.get(SLOT_FUEL);
         if (!stack.isEmpty()) {
             net.minecraft.util.ItemScatterer.spawn(world, pos, DefaultedList.ofSize(1, stack));
         }
     }
 
-    // GUI + inventory
-    private static final Text TITLE = Text.translatable("block.bodyhealthsystem.air_conditioner");
+    private static final Text TITLE = Text.translatable("block.bodyhealthsystem.space_heater");
 
     private final PropertyDelegate properties = new PropertyDelegate() {
         @Override public int get(int index) { return switch (index) { case 0 -> burnTime; case 1 -> burnTimeTotal; case 2 -> regulate ? 1 : 0; default -> 0; }; }
@@ -162,10 +146,9 @@ public class AirConditionerBlockEntity extends BlockEntity implements net.fabric
     @Nullable
     @Override
     public ScreenHandler createMenu(int syncId, net.minecraft.entity.player.PlayerInventory inv, PlayerEntity player) {
-        return new xyz.srgnis.bodyhealthsystem.client.screen.AirConditionerScreenHandler(syncId, inv, this, properties, this.pos);
+        return new xyz.srgnis.bodyhealthsystem.client.screen.SpaceHeaterScreenHandler(syncId, inv, this, properties, this.pos);
     }
 
-    // Inventory impl (1 slot)
     @Override public int size() { return items.size(); }
     @Override public boolean isEmpty() { return items.get(0).isEmpty(); }
     @Override public ItemStack getStack(int slot) { return items.get(slot); }
@@ -177,6 +160,5 @@ public class AirConditionerBlockEntity extends BlockEntity implements net.fabric
 
     public PropertyDelegate getProperties() { return properties; }
 
-    public static boolean isValidCoolant(ItemStack stack) { return getCoolantBurnTime(stack.getItem()) > 0; }
+    public static boolean isValidFuel(ItemStack stack) { return getFuelBurnTime(stack.getItem()) > 0; }
 }
-

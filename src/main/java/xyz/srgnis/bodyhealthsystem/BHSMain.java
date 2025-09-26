@@ -49,6 +49,7 @@ public class BHSMain implements ModInitializer {
 	public static Identifier id(String path) {
 		return new Identifier(MOD_ID, path);
 	}
+
 	@Override
 	public void onInitialize() {
 		Registry.register(Registries.ITEM_GROUP, BHS_GROUP, FabricItemGroup.builder()
@@ -71,7 +72,7 @@ public class BHSMain implements ModInitializer {
 			return new BlockThermalAPI.ThermalSource(
 					5.0, 5,
 					BlockThermalAPI.OcclusionMode.FLOOD_FILL,
-					7, 
+					7,
 					BlockThermalAPI.FalloffCurve.COSINE
 			);
 		}, 5);
@@ -122,27 +123,62 @@ public class BHSMain implements ModInitializer {
 
 		ScreenHandlers.registerScreenHandlers();
 
-		// Register AC dynamic thermal provider once; source depends on mode
+		// Air Conditioner: dynamic thermal provider
 		BlockThermalAPI.register((world, pos, state) -> {
 			if (!state.isOf(ModBlocks.AIR_CONDITIONER)) return null;
 			var be = world.getBlockEntity(pos);
 			if (!(be instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlockEntity ac)) return null;
 			// Require fuel
 			if (ac.getBurnTime() <= 0) return null;
-			// Directional emission out of the front face
-			net.minecraft.util.math.Direction face = state.get(net.minecraft.state.property.Properties.HORIZONTAL_FACING);
+			// Directional emission out of the block's front
+			Direction face = state.get(Properties.HORIZONTAL_FACING);
 
 			double deltaC;
 			if (ac.isRegulating()) {
-				// Aim for 22°C against environment to avoid feedback
+				// Regulate to 22°C against the environment (exclude block sources)
 				double env = TemperatureAPI.getEnvironmentCelsius(world, pos);
-				if (Double.isNaN(env) || env <= 22.0) return null; // no cooling needed
-				double error = 22.0 - env; // negative value
-				// Clamp cooling power between -8 and -0.5
-				deltaC = Math.max(-8.0, Math.min(-0.5, error));
+				if (Double.isNaN(env)) return null;
+				double error = 22.0 - env; // negative when too hot, positive when too cold
+				// Small deadband to prevent flicker
+				if (Math.abs(error) <= 0.25) return null;
+				// AC only cools: emit when too hot (error < 0). Use the full error (no artificial clamp).
+				if (error >= 0.0) return null;
+				deltaC = error; // negative
 			} else {
 				// Constant breeze
 				deltaC = -6.0;
+			}
+
+			return new BlockThermalAPI.ThermalSource(
+					deltaC, 8,
+					BlockThermalAPI.OcclusionMode.FLOOD_FILL,
+					7,
+					BlockThermalAPI.FalloffCurve.COSINE,
+					face
+			);
+		}, 15);
+
+		// Space Heater: dynamic thermal provider
+		BlockThermalAPI.register((world, pos, state) -> {
+			if (!state.isOf(ModBlocks.SPACE_HEATER)) return null;
+			var be = world.getBlockEntity(pos);
+			if (!(be instanceof xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlockEntity sh)) return null;
+			if (sh.getBurnTime() <= 0) return null;
+			Direction face = state.get(Properties.HORIZONTAL_FACING);
+
+			double deltaC;
+			if (sh.isRegulating()) {
+				// Regulate to 22°C against the environment (exclude block sources)
+				double env = TemperatureAPI.getEnvironmentCelsius(world, pos);
+				if (Double.isNaN(env)) return null;
+				double error = 22.0 - env; // positive when too cold
+				// Small deadband to prevent flicker
+				if (Math.abs(error) <= 0.25) return null;
+				// Heater only heats: emit when too cold (error > 0). Use the full error (no artificial clamp).
+				if (error <= 0.0) return null;
+				deltaC = error; // positive
+			} else {
+				deltaC = +6.0;
 			}
 
 			return new BlockThermalAPI.ThermalSource(

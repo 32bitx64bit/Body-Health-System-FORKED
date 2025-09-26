@@ -24,11 +24,18 @@ public class ScreenHandlers {
         return new AirConditionerScreenHandler(syncId, inv, new net.minecraft.inventory.SimpleInventory(1), new net.minecraft.screen.ArrayPropertyDelegate(3), pos);
     });
 
+    // Space Heater GUI
+    public static final net.minecraft.screen.ScreenHandlerType<xyz.srgnis.bodyhealthsystem.client.screen.SpaceHeaterScreenHandler> SPACE_HEATER_SCREEN_HANDLER = new ExtendedScreenHandlerType<>((syncId, inv, buf) -> {
+        BlockPos pos = buf.readBlockPos();
+        return new xyz.srgnis.bodyhealthsystem.client.screen.SpaceHeaterScreenHandler(syncId, inv, new net.minecraft.inventory.SimpleInventory(1), new net.minecraft.screen.ArrayPropertyDelegate(3), pos);
+    });
+
     public static void registerScreenHandlers() {
         // Legacy id
         Registry.register(Registries.SCREEN_HANDLER, id("medkit"), HEAL_SCREEN_HANDLER);
         // New unified GUI id
         Registry.register(Registries.SCREEN_HANDLER, id("body_ops"), BODY_OPS_SCREEN_HANDLER);
         Registry.register(Registries.SCREEN_HANDLER, id("air_conditioner"), AIR_CONDITIONER_SCREEN_HANDLER);
+        Registry.register(Registries.SCREEN_HANDLER, id("space_heater"), SPACE_HEATER_SCREEN_HANDLER);
     }
 }

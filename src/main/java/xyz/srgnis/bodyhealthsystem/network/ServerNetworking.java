@@ -24,6 +24,7 @@ import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.config.Config;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
+import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
 
@@ -87,6 +88,18 @@ public class ServerNetworking {
                 var be = player.getWorld().getBlockEntity(pos);
                 if (be instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlockEntity ac) {
                     ac.setRegulating(regulate);
+                }
+            });
+        });
+
+        // Space Heater mode toggle
+        ServerPlayNetworking.registerGlobalReceiver(id("heater_mode"), (server, player, handler, buf, responseSender) -> {
+            BlockPos pos = buf.readBlockPos();
+            boolean regulate = buf.readBoolean();
+            server.execute(() -> {
+                var be = player.getWorld().getBlockEntity(pos);
+                if (be instanceof xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlockEntity sh) {
+                    sh.setRegulating(regulate);
                 }
             });
         });

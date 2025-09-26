@@ -103,11 +103,15 @@
 
   "tooltip.bodyhealthsystem.straw_hat": "A cool-looking straw hat.",
   "block.bodyhealthsystem.air_conditioner": "Air Conditioner",
-  "screen.bodyhealthsystem.ac.mode_breeze": "Mode: Breeze",
-  "screen.bodyhealthsystem.ac.mode_regulate": "Mode: Constant",
+  "screen.bodyhealthsystem.ac.mode_breeze": "Power: Stable",
+  "screen.bodyhealthsystem.ac.mode_regulate": "Power: Variable",
 
   "message.bodyhealthsystem.cooling_gel.applied": "Applied +1 cold resistance tier to armor.",
   "message.bodyhealthsystem.cooling_gel.max": "Armor is already at max cold resistance.",
   "message.bodyhealthsystem.heating_gel.applied": "Applied +1 heat resistance tier to armor.",
-  "message.bodyhealthsystem.heating_gel.max": "Armor is already at max heat resistance."
+  "message.bodyhealthsystem.heating_gel.max": "Armor is already at max heat resistance.",
+
+  "block.bodyhealthsystem.space_heater": "Space Heater",
+  "screen.bodyhealthsystem.heater.mode_heater": "Power: Stable",
+  "screen.bodyhealthsystem.heater.mode_regulate": "Power: Variable"
 }

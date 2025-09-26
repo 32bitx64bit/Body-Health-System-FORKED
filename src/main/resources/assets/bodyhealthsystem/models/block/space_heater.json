@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "particle": "bodyhealthsystem:block/heater_front",
+    "down": "bodyhealthsystem:block/heater_bottom",
+    "up": "bodyhealthsystem:block/heater_top",
+    "north": "bodyhealthsystem:block/heater_front",
+    "south": "bodyhealthsystem:block/heater_back",
+    "west": "bodyhealthsystem:block/heater_side_e",
+    "east": "bodyhealthsystem:block/heater_side"
+  }
+}
