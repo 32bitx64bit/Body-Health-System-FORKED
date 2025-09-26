@@ -135,10 +135,10 @@ public class BHSMain implements ModInitializer {
 
 			double deltaC;
 			if (ac.isRegulating()) {
-				// Regulate to 22°C against the environment (exclude block sources)
+				// Regulate to 26°C against the environment (exclude block sources)
 				double env = TemperatureAPI.getEnvironmentCelsius(world, pos);
 				if (Double.isNaN(env)) return null;
-				double error = 22.0 - env; // negative when too hot, positive when too cold
+				double error = 26.0 - env; // negative when too hot, positive when too cold
 				// Small deadband to prevent flicker
 				if (Math.abs(error) <= 0.25) return null;
 				// AC only cools: emit when too hot (error < 0). Use the full error (no artificial clamp).
@@ -168,10 +168,10 @@ public class BHSMain implements ModInitializer {
 
 			double deltaC;
 			if (sh.isRegulating()) {
-				// Regulate to 22°C against the environment (exclude block sources)
+				// Regulate to 26°C against the environment (exclude block sources)
 				double env = TemperatureAPI.getEnvironmentCelsius(world, pos);
 				if (Double.isNaN(env)) return null;
-				double error = 22.0 - env; // positive when too cold
+				double error = 26.0 - env; // positive when too cold
 				// Small deadband to prevent flicker
 				if (Math.abs(error) <= 0.25) return null;
 				// Heater only heats: emit when too cold (error > 0). Use the full error (no artificial clamp).
