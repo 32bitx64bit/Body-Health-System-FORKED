@@ -93,6 +93,19 @@ public class AirConditionerBlockEntity extends BlockEntity implements net.fabric
             }
             be.burnTime -= consume; // consume scaled by demand
             if (be.burnTime < 0) be.burnTime = 0;
+            // Instant refill to prevent 1-tick flicker when fuel
+            if (be.burnTime <= 0 && wantsCooling) {
+                ItemStack stack2 = be.items.get(SLOT_COOLANT);
+                if (!stack2.isEmpty()) {
+                    int burn2 = getCoolantBurnTime(stack2.getItem());
+                    if (burn2 > 0) {
+                        stack2.decrement(1);
+                        be.burnTime = burn2;
+                        be.burnTimeTotal = burn2;
+                        be.markDirty();
+                    }
+                }
+            }
         }
 
         boolean isBurning = be.burnTime > 0 && wantsCooling;

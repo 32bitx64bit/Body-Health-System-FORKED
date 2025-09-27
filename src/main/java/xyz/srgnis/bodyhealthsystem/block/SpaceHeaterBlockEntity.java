@@ -83,6 +83,19 @@ public class SpaceHeaterBlockEntity extends BlockEntity implements net.fabricmc.
             }
             be.burnTime -= consume;
             if (be.burnTime < 0) be.burnTime = 0;
+            // Instant refill to prevent 1-tick flicker when fuel expires
+            if (be.burnTime <= 0 && wantsHeating) {
+                ItemStack stack2 = be.items.get(SLOT_FUEL);
+                if (!stack2.isEmpty()) {
+                    int burn2 = getFuelBurnTime(stack2.getItem());
+                    if (burn2 > 0) {
+                        stack2.decrement(1);
+                        be.burnTime = burn2;
+                        be.burnTimeTotal = burn2;
+                        be.markDirty();
+                    }
+                }
+            }
         }
 
         boolean isBurning = be.burnTime > 0 && wantsHeating;
