@@ -26,15 +26,16 @@ import xyz.srgnis.bodyhealthsystem.registry.ModBlocks;
 public class SpaceHeaterBlock extends BlockWithEntity {
     public static final DirectionProperty FACING = Properties.HORIZONTAL_FACING;
     public static final BooleanProperty LIT = Properties.LIT;
+    public static final BooleanProperty REGULATE = BooleanProperty.of("regulate");
 
     public SpaceHeaterBlock(Settings settings) {
         super(settings);
-        this.setDefaultState(this.getDefaultState().with(FACING, Direction.NORTH).with(LIT, false));
+        this.setDefaultState(this.getDefaultState().with(FACING, Direction.NORTH).with(LIT, false).with(REGULATE, false));
     }
 
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(FACING, LIT);
+        builder.add(FACING, LIT, REGULATE);
     }
 
     @Override

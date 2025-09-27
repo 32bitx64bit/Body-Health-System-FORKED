@@ -28,15 +28,16 @@ import net.minecraft.util.math.random.Random;
 public class AirConditionerBlock extends BlockWithEntity {
     public static final DirectionProperty FACING = Properties.HORIZONTAL_FACING;
     public static final BooleanProperty LIT = Properties.LIT; // "active" like furnace
+    public static final BooleanProperty REGULATE = BooleanProperty.of("regulate");
 
     public AirConditionerBlock(Settings settings) {
         super(settings);
-        this.setDefaultState(this.getDefaultState().with(FACING, Direction.NORTH).with(LIT, false));
+        this.setDefaultState(this.getDefaultState().with(FACING, Direction.NORTH).with(LIT, false).with(REGULATE, false));
     }
 
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(FACING, LIT);
+        builder.add(FACING, LIT, REGULATE);
     }
 
     @Override

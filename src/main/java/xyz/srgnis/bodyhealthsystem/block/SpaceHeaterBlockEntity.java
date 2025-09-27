@@ -46,6 +46,15 @@ public class SpaceHeaterBlockEntity extends BlockEntity implements net.fabricmc.
     public static void serverTick(World world, BlockPos pos, BlockState state, SpaceHeaterBlockEntity be) {
         if (world.isClient) return;
 
+        // Keep blockstate REGULATE in sync with BE value so client providers can read it
+        if (state.getBlock() instanceof xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock) {
+            Boolean has = state.contains(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE);
+            if (has && state.get(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE) != be.regulate) {
+                world.setBlockState(pos, state.with(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE, be.regulate), 3);
+                state = world.getBlockState(pos);
+            }
+        }
+
         boolean wantsHeating;
         double envC = Double.NaN;
         if (!be.regulate) {

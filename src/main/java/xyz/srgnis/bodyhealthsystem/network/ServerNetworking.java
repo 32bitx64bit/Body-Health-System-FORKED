@@ -85,9 +85,17 @@ public class ServerNetworking {
             BlockPos pos = buf.readBlockPos();
             boolean regulate = buf.readBoolean();
             server.execute(() -> {
-                var be = player.getWorld().getBlockEntity(pos);
+                var world = player.getWorld();
+                var be = world.getBlockEntity(pos);
                 if (be instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlockEntity ac) {
                     ac.setRegulating(regulate);
+                    var state = world.getBlockState(pos);
+                    if (state.getBlock() instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlock) {
+                        if (state.contains(xyz.srgnis.bodyhealthsystem.block.AirConditionerBlock.REGULATE)
+                                && state.get(xyz.srgnis.bodyhealthsystem.block.AirConditionerBlock.REGULATE) != regulate) {
+                            world.setBlockState(pos, state.with(xyz.srgnis.bodyhealthsystem.block.AirConditionerBlock.REGULATE, regulate), 3);
+                        }
+                    }
                 }
             });
         });
@@ -97,9 +105,17 @@ public class ServerNetworking {
             BlockPos pos = buf.readBlockPos();
             boolean regulate = buf.readBoolean();
             server.execute(() -> {
-                var be = player.getWorld().getBlockEntity(pos);
+                var world = player.getWorld();
+                var be = world.getBlockEntity(pos);
                 if (be instanceof xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlockEntity sh) {
                     sh.setRegulating(regulate);
+                    var state = world.getBlockState(pos);
+                    if (state.getBlock() instanceof xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock) {
+                        if (state.contains(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE)
+                                && state.get(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE) != regulate) {
+                            world.setBlockState(pos, state.with(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE, regulate), 3);
+                        }
+                    }
                 }
             });
         });

@@ -123,29 +123,25 @@ public class BHSMain implements ModInitializer {
 
 		ScreenHandlers.registerScreenHandlers();
 
-		// Air Conditioner: dynamic thermal provider
+		// Air Conditioner: dynamic thermal provider (client-safe; uses blockstate-only)
 		BlockThermalAPI.register((world, pos, state) -> {
 			if (!state.isOf(ModBlocks.AIR_CONDITIONER)) return null;
-			var be = world.getBlockEntity(pos);
-			if (!(be instanceof xyz.srgnis.bodyhealthsystem.block.AirConditionerBlockEntity ac)) return null;
-			// Require fuel
-			if (ac.getBurnTime() <= 0) return null;
-			// Directional emission out of the block's front
+			// Require LIT so client and server agree
+			if (!state.contains(Properties.LIT) || !state.get(Properties.LIT)) return null;
+			boolean regulate = state.contains(xyz.srgnis.bodyhealthsystem.block.AirConditionerBlock.REGULATE)
+					&& state.get(xyz.srgnis.bodyhealthsystem.block.AirConditionerBlock.REGULATE);
 			Direction face = state.get(Properties.HORIZONTAL_FACING);
 
 			double deltaC;
-			if (ac.isRegulating()) {
+			if (regulate) {
 				// Regulate to 22°C against the environment (exclude block sources)
 				double env = TemperatureAPI.getEnvironmentCelsius(world, pos);
 				if (Double.isNaN(env)) return null;
 				double error = 22.0 - env; // negative when too hot, positive when too cold
-				// Small deadband to prevent flicker
-				if (Math.abs(error) <= 0.25) return null;
-				// AC only cools: emit when too hot (error < 0). Use the full error (no artificial clamp).
-				if (error >= 0.0) return null;
+				if (Math.abs(error) <= 0.25) return null; // deadband
+				if (error >= 0.0) return null; // AC only cools when too hot
 				deltaC = error; // negative
 			} else {
-				// Constant breeze
 				deltaC = -6.0;
 			}
 
@@ -158,24 +154,22 @@ public class BHSMain implements ModInitializer {
 			);
 		}, 15);
 
-		// Space Heater: dynamic thermal provider
+		// Space Heater: dynamic thermal provider (client-safe; uses blockstate-only)
 		BlockThermalAPI.register((world, pos, state) -> {
 			if (!state.isOf(ModBlocks.SPACE_HEATER)) return null;
-			var be = world.getBlockEntity(pos);
-			if (!(be instanceof xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlockEntity sh)) return null;
-			if (sh.getBurnTime() <= 0) return null;
+			if (!state.contains(Properties.LIT) || !state.get(Properties.LIT)) return null;
+			boolean regulate = state.contains(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE)
+					&& state.get(xyz.srgnis.bodyhealthsystem.block.SpaceHeaterBlock.REGULATE);
 			Direction face = state.get(Properties.HORIZONTAL_FACING);
 
 			double deltaC;
-			if (sh.isRegulating()) {
+			if (regulate) {
 				// Regulate to 22°C against the environment (exclude block sources)
 				double env = TemperatureAPI.getEnvironmentCelsius(world, pos);
 				if (Double.isNaN(env)) return null;
 				double error = 22.0 - env; // positive when too cold
-				// Small deadband to prevent flicker
-				if (Math.abs(error) <= 0.25) return null;
-				// Heater only heats: emit when too cold (error > 0). Use the full error (no artificial clamp).
-				if (error <= 0.0) return null;
+				if (Math.abs(error) <= 0.25) return null; // deadband
+				if (error <= 0.0) return null; // heater only heats when too cold
 				deltaC = error; // positive
 			} else {
 				deltaC = +6.0;
