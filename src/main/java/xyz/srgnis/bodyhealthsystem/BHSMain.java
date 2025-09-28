@@ -113,6 +113,16 @@ public class BHSMain implements ModInitializer {
 			return null;
 		});
 
+		// Portable Fan in hand -> grant Heat Resistance Tier 4 (8°C)
+		TemperatureResistanceAPI.registerProvider(player -> {
+			if (player == null) return null;
+			var main = player.getMainHandStack();
+			var off = player.getOffHandStack();
+			boolean hasFan = (!main.isEmpty() && main.isOf(ModItems.PORTABLE_FAN)) || (!off.isEmpty() && off.isOf(ModItems.PORTABLE_FAN));
+			if (!hasFan) return null;
+			return new TemperatureResistanceAPI.Resistance(TemperatureResistanceAPI.tierToDegrees(4), 0.0);
+		});
+
 		// If configured, force the actual game rule to false on server start
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			if (Config.forceDisableVanillaRegen) {

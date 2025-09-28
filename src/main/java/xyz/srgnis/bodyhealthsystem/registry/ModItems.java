@@ -21,6 +21,7 @@ import xyz.srgnis.bodyhealthsystem.items.StrawHatItem;
 import xyz.srgnis.bodyhealthsystem.items.CoolingGelItem;
 import xyz.srgnis.bodyhealthsystem.items.HeatingGelItem;
 import xyz.srgnis.bodyhealthsystem.items.ThermometerItem;
+import xyz.srgnis.bodyhealthsystem.items.PortableFanItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -42,6 +43,7 @@ public class ModItems {
     public static final Item COOLING_GEL = new CoolingGelItem(new FabricItemSettings().maxCount(16));
     public static final Item HEATING_GEL = new HeatingGelItem(new FabricItemSettings().maxCount(16));
     public static final Item THERMOMETER = new ThermometerItem(new FabricItemSettings().maxCount(1));
+    public static final Item PORTABLE_FAN = new PortableFanItem(new FabricItemSettings().maxCount(1));
 
     public static void registerItems(){
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "plaster"), PLASTER_ITEM);
@@ -61,6 +63,7 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"cooling_gel"), COOLING_GEL);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"heating_gel"), HEATING_GEL);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"thermometer"), THERMOMETER);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"portable_fan"), PORTABLE_FAN);
 
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(PLASTER_ITEM);
@@ -98,6 +101,7 @@ public class ModItems {
             content.add(COOLING_GEL);
             content.add(HEATING_GEL);
             content.add(THERMOMETER);
+            content.add(PORTABLE_FAN);
         });
     }
 }
