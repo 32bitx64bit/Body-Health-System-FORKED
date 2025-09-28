@@ -23,7 +23,7 @@ public class StrawHatItem extends ArmorItem {
 
     // Desired stats
     private static final double ARMOR_POINTS = 1.5; // armor value
-    private static final int DEFAULT_HEAT_TIER = 5; // +10°C heat comfort
+    private static final int DEFAULT_HEAT_TIER = 4; // +8°C heat comfort
 
     private final Multimap<EntityAttribute, EntityAttributeModifier> attributeModifiers;
 
