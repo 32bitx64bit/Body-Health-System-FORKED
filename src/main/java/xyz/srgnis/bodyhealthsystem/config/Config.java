@@ -55,7 +55,7 @@ public class Config extends MidnightConfig {
     @Entry public static boolean hiddeVanillaHealth = true;
 
     @Comment(centered = true) public static Comment comment_inventoryHud;
-    @Entry public static boolean showInventoryBodyHud = true;
+    @Entry public static boolean showInventoryBodyHud = false;
 
     @Comment(centered = true) public static Comment comment_temperature;
     @Entry public static boolean enableTemperatureSystem = true;
