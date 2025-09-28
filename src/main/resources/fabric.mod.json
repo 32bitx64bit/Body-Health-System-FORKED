@@ -37,6 +37,6 @@
     "fabric-api": "*",
     "minecraft": "~1.20",
     "java": ">=17",
-    "temperatureapi": ">=1.1.3"
+    "temperatureapi": ">=1.1.5"
   }
 }
