@@ -35,13 +35,11 @@ public class ModBlocks {
 
     public static final Block AIR_CONDITIONER = new AirConditionerBlock(AbstractBlock.Settings.create()
             .strength(2.5f)
-            .sounds(BlockSoundGroup.METAL)
-            .nonOpaque());
+            .sounds(BlockSoundGroup.METAL));
 
     public static final Block SPACE_HEATER = new SpaceHeaterBlock(AbstractBlock.Settings.create()
             .strength(2.5f)
-            .sounds(BlockSoundGroup.METAL)
-            .nonOpaque());
+            .sounds(BlockSoundGroup.METAL));
 
     public static BlockEntityType<AirConditionerBlockEntity> AIR_CONDITIONER_BE;
     public static BlockEntityType<SpaceHeaterBlockEntity> SPACE_HEATER_BE;

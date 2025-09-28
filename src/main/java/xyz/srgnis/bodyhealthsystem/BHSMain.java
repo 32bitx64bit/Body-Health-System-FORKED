@@ -155,10 +155,15 @@ public class BHSMain implements ModInitializer {
 				deltaC = -6.0;
 			}
 
+			// Nerf range and increase dropoff when the front face is exposed outdoors (directional-aware)
+			boolean outside = BlockThermalAPI.isOutside(world, pos, face);
+			int range = outside ? 4 : 7;
+			int dropoff = outside ? 4 : 7;
+
 			return new BlockThermalAPI.ThermalSource(
-					deltaC, 8,
+					deltaC, range,
 					BlockThermalAPI.OcclusionMode.FLOOD_FILL,
-					7,
+					dropoff,
 					BlockThermalAPI.FalloffCurve.COSINE,
 					face
 			);
@@ -185,10 +190,15 @@ public class BHSMain implements ModInitializer {
 				deltaC = +6.0;
 			}
 
+			// Nerf range and increase dropoff when the front face is exposed outdoors (directional-aware)
+			boolean outside = BlockThermalAPI.isOutside(world, pos, face);
+			int range = outside ? 4 : 7;
+			int dropoff = outside ? 4 : 7;
+
 			return new BlockThermalAPI.ThermalSource(
-					deltaC, 8,
+					deltaC, range,
 					BlockThermalAPI.OcclusionMode.FLOOD_FILL,
-					7,
+					dropoff,
 					BlockThermalAPI.FalloffCurve.COSINE,
 					face
 			);
