@@ -65,6 +65,10 @@
 
   "bodyhealthsystem.midnightconfig.comment_temperature": "Temperature System",
   "bodyhealthsystem.midnightconfig.enableTemperatureSystem": "Enable Temperature System",
+  "bodyhealthsystem.midnightconfig.comment_tempDisplay": "Temperature Display",
+  "bodyhealthsystem.midnightconfig.temperatureUnit": "Temperature Unit",
+  "bodyhealthsystem.midnightconfig.enum.TemperatureUnit.CELSIUS": "Celsius (°C)",
+  "bodyhealthsystem.midnightconfig.enum.TemperatureUnit.FAHRENHEIT": "Fahrenheit (°F)",
 
   "bodyhealthsystem.midnightconfig.comment_maxHealth": "Max Health",
   "bodyhealthsystem.midnightconfig.comment_armorMult": "Armor Multipliers",

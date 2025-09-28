@@ -3,7 +3,7 @@ package xyz.srgnis.bodyhealthsystem.config;
 public class Config extends MidnightConfig {
 
     // Config versioning
-    public static final int CONFIG_VERSION_CURRENT = 2;
+    public static final int CONFIG_VERSION_CURRENT = 3;
     @Server @Entry public static int configVersion = 0;
 
     @Comment(centered = true) public static Comment comment_maxHealth;
@@ -60,11 +60,19 @@ public class Config extends MidnightConfig {
     @Comment(centered = true) public static Comment comment_temperature;
     @Entry public static boolean enableTemperatureSystem = true;
 
+    @Comment(centered = true) public static Comment comment_tempDisplay;
+    @Entry public static TemperatureUnit temperatureUnit = TemperatureUnit.CELSIUS;
+
     public enum HudPosition {
         TOP_RIGHT,
         TOP_LEFT,
         BOTTOM_RIGHT,
         BOTTOM_LEFT;
+    }
+
+    public enum TemperatureUnit {
+        CELSIUS,
+        FAHRENHEIT;
     }
 
 }

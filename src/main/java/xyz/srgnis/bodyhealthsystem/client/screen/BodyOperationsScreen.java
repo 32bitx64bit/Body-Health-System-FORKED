@@ -288,7 +288,13 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int white = 0xFFFFFF;
 
         if (xyz.srgnis.bodyhealthsystem.config.Config.enableTemperatureSystem && showTemperature) {
-            String tempStr = String.format("%.1f°C", bodyTempC);
+            String tempStr;
+            if (xyz.srgnis.bodyhealthsystem.config.Config.temperatureUnit == xyz.srgnis.bodyhealthsystem.config.Config.TemperatureUnit.FAHRENHEIT) {
+                double f = bodyTempC * 9.0 / 5.0 + 32.0;
+                tempStr = String.format("%.1f°F", f);
+            } else {
+                tempStr = String.format("%.1f°C", bodyTempC);
+            }
             int textW = tr.getWidth(tempStr);
             // Center roughly over torso
             int torsoCenterX = baseX + sx(GUIConstants.SCALED_TORSO_X_OFFSET) + sx(GUIConstants.SCALED_TORSO_WIDTH) / 2;
