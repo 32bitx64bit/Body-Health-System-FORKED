@@ -247,13 +247,12 @@ public class PlayerTickMixin {
             // Hypothermia
             if (tempC < 35.0) {
                 if (tempC >= 32.0) {
-                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 0, false, false, false));
-                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 0, false, false, false));
+                    // Mild hypothermia: icon only, no gameplay debuffs
                     setColdConditionStage(player, 1);
                 } else if (tempC >= 28.0) {
                     player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 1, false, false, false));
                     player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, 0, false, false, false));
-                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 1, false, false, false));
+                    player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 0, false, false, false));
                     setColdConditionStage(player, 2);
                     // periodic cold damage (60s)
                     bhs$coldTickCounter++;
