@@ -271,9 +271,9 @@ public class PlayerTickMixin {
                     player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, 1, false, false, false));
                     player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, 2, false, false, false));
                     setColdConditionStage(player, 3);
-                    // periodic cold damage (10s)
+                    // periodic cold damage (15s)
                     bhs$coldTickCounter++;
-                    if (bhs$coldTickCounter >= 200) {
+                    if (bhs$coldTickCounter >= 300) {
                         bhs$coldTickCounter = 0;
                         java.util.List<BodyPart> targets = pickColdTargets(body);
                         if (!targets.isEmpty()) {
