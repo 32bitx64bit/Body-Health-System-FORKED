@@ -11,6 +11,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import org.lwjgl.glfw.GLFW;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
+import xyz.srgnis.bodyhealthsystem.body.Body;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts;
 import xyz.srgnis.bodyhealthsystem.constants.GUIConstants;
@@ -70,6 +71,9 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     private boolean boneLayerWasEnabledOnOpen = false;
     private boolean usedMedkit = false;
 
+    // Small vertical shift to keep feet labels within the GUI
+    private static final float BODY_Y_SHIFT_LOGICAL = 5.0f; // logical pixels, scaled by DRAW_SCALE
+
     // Temperature view state
     private boolean showTemperature = false;
     private double bodyTempC = BodyTemperatureAPI.NORMAL_BODY_TEMP_C;
@@ -115,7 +119,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int top = startY + topRegion;
         int availH = this.backgroundHeight - topRegion - bottomRegion;
         int bodyHpx = Math.round(GUIConstants.SCALED_BODY_HEIGHT * bodyScale);
-        int baseY = top + Math.max(0, (availH - bodyHpx) / 2);
+        int shiftY = Math.round(BODY_Y_SHIFT_LOGICAL * DRAW_SCALE);
+        int baseY = top + Math.max(0, (availH - bodyHpx) / 2) - shiftY;
         int baseX = left;
 
         // Part hitboxes scaled to screen pixels
@@ -184,7 +189,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int top = startY + topRegion;
         int availH = this.backgroundHeight - topRegion - bottomRegion;
         int bodyHpx = Math.round(GUIConstants.SCALED_BODY_HEIGHT * bodyScale);
-        int baseY = top + Math.max(0, (availH - bodyHpx) / 2);
+        int shiftY = Math.round(BODY_Y_SHIFT_LOGICAL * DRAW_SCALE);
+        int baseY = top + Math.max(0, (availH - bodyHpx) / 2) - shiftY;
 
         // Draw parts with health color backgrounds and optional bone overlays
         drawPart(drawContext, PlayerBodyParts.HEAD, baseX + sx(GUIConstants.SCALED_HEAD_X_OFFSET), baseY + sy(GUIConstants.SCALED_HEAD_Y_OFFSET), sx(GUIConstants.SCALED_HEAD_WIDTH), sy(GUIConstants.SCALED_HEAD_HEIGHT));
@@ -255,6 +261,20 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                         java.util.List<Text> list = new java.util.ArrayList<>();
                         list.add(Text.literal(part.getIdentifier().getPath()));
                         list.add(Text.literal("" + Math.round(part.getHealth()) + "/" + Math.round(part.getMaxHealth())));
+                        float totalAbs = handler.getEntity() != null ? handler.getEntity().getAbsorptionAmount() : 0.0f;
+                        if (totalAbs > 0.0f) {
+                            float alloc = allocatedAbsorptionFor(handler.getBody(), part.getIdentifier(), totalAbs);
+                            if (alloc > 0.0f) list.add(Text.literal("Absorption: " + Math.round(alloc)));
+                        }
+                        // Direct extra HP from max health (Health Boost or attributes)
+                        float extraHP = 0.0f;
+                        if (handler.getEntity() != null) {
+                            extraHP = Math.max(0.0f, handler.getEntity().getMaxHealth() - 20.0f);
+                        }
+                        if (extraHP > 0.0f) {
+                            float hbAlloc = allocatedAbsorptionFor(handler.getBody(), part.getIdentifier(), extraHP);
+                            if (hbAlloc > 0.0f) list.add(Text.literal("Health Boost: " + Math.round(hbAlloc)));
+                        }
                         if (part.isBroken()) list.add(Text.literal("Broken"));
                         drawContext.drawTooltip(this.textRenderer, list, mouseX, mouseY);
                     }
@@ -283,7 +303,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int top = startY + topRegion;
         int availH = this.backgroundHeight - topRegion - bottomRegion;
         int bodyHpx = Math.round(GUIConstants.SCALED_BODY_HEIGHT * bodyScale);
-        int baseY = top + Math.max(0, (availH - bodyHpx) / 2);
+        int shiftY = Math.round(BODY_Y_SHIFT_LOGICAL * DRAW_SCALE);
+        int baseY = top + Math.max(0, (availH - bodyHpx) / 2) - shiftY;
         var tr = MinecraftClient.getInstance().textRenderer;
         int white = 0xFFFFFF;
 
@@ -409,7 +430,71 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         return broken ? TEX_BONEMAIN_BROKEN : TEX_BONEMAIN;
     }
 
-    private static String formatHealth(BodyPart p) { return String.valueOf(Math.round(p.getHealth())); }
+    private String formatHealth(BodyPart p) {
+        if (p == null) return "0";
+        int hp = Math.round(p.getHealth());
+        LivingEntity target = this.handler.getEntity();
+        float totalAbs = target != null ? target.getAbsorptionAmount() : 0.0f;
+        float extraHP = target != null ? Math.max(0.0f, target.getMaxHealth() - 20.0f) : 0.0f;
+        float addAbs = 0.0f;
+        if (totalAbs > 0.0f) {
+            addAbs = allocatedAbsorptionFor(this.handler.getBody(), p.getIdentifier(), totalAbs);
+        }
+        float addHB = 0.0f;
+        if (extraHP > 0.0f) {
+            addHB = allocatedAbsorptionFor(this.handler.getBody(), p.getIdentifier(), extraHP);
+        }
+        int add = Math.round(addAbs + addHB);
+        if (add > 0) {
+            return hp + " (+" + add + ")";
+        }
+        return String.valueOf(hp);
+    }
+
+    // Deterministic client-side allocation for display (mirrors server priority rules)
+    private static float allocatedAbsorptionFor(Body body, Identifier partId, float total) {
+        if (body == null || total <= 0.0f) return 0.0f;
+        BodyPart part = body.getPart(partId);
+        if (part == null || part.getHealth() <= 0.0f) return 0.0f;
+        Identifier HEAD = PlayerBodyParts.HEAD;
+        Identifier TORSO = PlayerBodyParts.TORSO;
+        float headCap = 2.0f;
+        float torsoCap = 2.0f;
+
+        float toHead = 0.0f;
+        BodyPart head = body.getPart(HEAD);
+        if (head != null && head.getHealth() > 0.0f) {
+            toHead = Math.min(headCap, total);
+        }
+        if (partId.equals(HEAD)) return toHead;
+        float remAfterHead = Math.max(0.0f, total - toHead);
+
+        float toTorso = 0.0f;
+        BodyPart torso = body.getPart(TORSO);
+        if (torso != null && torso.getHealth() > 0.0f) {
+            toTorso = Math.min(torsoCap, remAfterHead);
+        }
+        if (partId.equals(TORSO)) return toTorso;
+        float rem = Math.max(0.0f, remAfterHead - toTorso);
+        if (rem <= 0.0f) return 0.0f;
+
+        java.util.List<BodyPart> limbs = new java.util.ArrayList<>();
+        addAlive(limbs, body, PlayerBodyParts.LEFT_ARM);
+        addAlive(limbs, body, PlayerBodyParts.RIGHT_ARM);
+        addAlive(limbs, body, PlayerBodyParts.LEFT_LEG);
+        addAlive(limbs, body, PlayerBodyParts.RIGHT_LEG);
+        addAlive(limbs, body, PlayerBodyParts.LEFT_FOOT);
+        addAlive(limbs, body, PlayerBodyParts.RIGHT_FOOT);
+        if (limbs.isEmpty()) return 0.0f;
+        float share = rem / (float) limbs.size();
+        for (BodyPart bp : limbs) if (bp.getIdentifier().equals(partId)) return share;
+        return 0.0f;
+    }
+
+    private static void addAlive(java.util.List<BodyPart> list, Body body, Identifier id) {
+        BodyPart p = body.getPart(id);
+        if (p != null && p.getHealth() > 0.0f) list.add(p);
+    }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

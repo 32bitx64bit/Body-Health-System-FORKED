@@ -112,18 +112,31 @@ public class PlayerBody extends Body {
         amount = applyArmorToDamage(source, amount, part);
         float f = amount = ((ModifyAppliedDamageInvoker)entity).invokeModifyAppliedDamage(source, amount);
 
-        //Copied from PlayerEntity.applyDamage
-        amount = Math.max(amount - entity.getAbsorptionAmount(), 0.0f);
-        entity.setAbsorptionAmount(entity.getAbsorptionAmount() - (f - amount));
-        float g = f - amount;
-        if (g > 0.0f && g < 3.4028235E37f) {
-            player.increaseStat(Stats.DAMAGE_ABSORBED, Math.round(g * 10.0f));
+        // Distributed absorption: allocate from the bucket of the hit part
+        ensureAbsorptionBucketsUpToDate();
+        float currentAbs = entity.getAbsorptionAmount();
+        float bucket = getAbsorptionBucket(part);
+        float consumed = Math.min(amount, bucket);
+        if (consumed > 0.0f) {
+            consumeAbsorptionFromBucket(part, consumed);
+            entity.setAbsorptionAmount(Math.max(0.0f, currentAbs - consumed));
+            // Player stat for absorbed damage (self)
+            player.increaseStat(Stats.DAMAGE_ABSORBED, Math.round(consumed * 10.0f));
+            amount -= consumed;
+        }
+        // Then consume from Health Boost bucket (direct max health increase beyond 20)
+        ensureBoostBucketsUpToDate();
+        float boost = getBoostBucket(part);
+        float bConsumed = Math.min(amount, boost);
+        if (bConsumed > 0.0f) {
+            consumeBoostFromBucket(part, bConsumed);
+            amount -= bConsumed;
         }
         if (amount == 0.0f) {
-            return amount;
+            return 0.0f;
         }
+
         player.addExhaustion(source.getExhaustion());
-        float h = entity.getHealth();
         player.getDamageTracker().onDamage(source, amount);
         if (amount < 3.4028235E37f) {
             player.increaseStat(Stats.DAMAGE_TAKEN, Math.round(amount * 10.0f));
