@@ -5,7 +5,9 @@ Players health is splitted in different body parts, when a part receives damage 
 If some parts lose all the health debuffs will be applied to the player, as slowness, mining fatigue and weakness.
 
 ## Download here!
-https://modrinth.com/mod/body-health-system-forked
+Modrinth : https://modrinth.com/mod/body-health-system-forked
+
+CursedForge : https://www.curseforge.com/minecraft/mc-mods/body-health-system-forked
 
 ## Benefits of the fork
 
