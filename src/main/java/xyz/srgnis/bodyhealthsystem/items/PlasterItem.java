@@ -80,14 +80,16 @@ public class PlasterItem extends Item {
                 Body body = ((BodyProvider) target).getBody();
                 BodyPart best = null;
 
-                // First: if any broken parts exist, heal the most missing among them
+                // First: if any broken parts exist, heal the most missing among them (use boosted cap)
                 BodyPart bestBroken = null;
                 float brokenMissing = 0f;
                 for (BodyPart part : body.getParts()) {
                     float health = part.getHealth();
-                    float max = part.getMaxHealth();
+                    float baseMax = part.getMaxHealth();
+                    float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
+                    float effMax = baseMax + boost;
                     if (health <= 0f) {
-                        float missing = max - health;
+                        float missing = effMax - health;
                         if (bestBroken == null || missing > brokenMissing) {
                             bestBroken = part;
                             brokenMissing = missing;
@@ -98,17 +100,19 @@ public class PlasterItem extends Item {
                 if (bestBroken != null) {
                     best = bestBroken;
                 } else {
-                    // Second: prioritize torso/head if damaged
+                    // Second: prioritize torso/head if damaged (use boosted cap)
                     BodyPart bestTorsoHead = null;
                     int bestTHPriority = -1; // 1 = critical, 0 = damaged
                     float bestTHMissing = 0f;
                     for (BodyPart part : body.getParts()) {
                         if (!part.getIdentifier().equals(PlayerBodyParts.HEAD) && !part.getIdentifier().equals(PlayerBodyParts.TORSO)) continue;
                         float health = part.getHealth();
-                        float max = part.getMaxHealth();
-                        if (health >= max) continue; // not damaged
+                        float baseMax = part.getMaxHealth();
+                        float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
+                        float effMax = baseMax + boost;
+                        if (health >= effMax) continue; // not damaged
                         int priority = (health <= part.getCriticalThreshold()) ? 1 : 0;
-                        float missing = max - health;
+                        float missing = effMax - health;
                         if (priority > bestTHPriority || (priority == bestTHPriority && missing > bestTHMissing)) {
                             bestTorsoHead = part;
                             bestTHPriority = priority;
@@ -118,16 +122,18 @@ public class PlasterItem extends Item {
                     if (bestTorsoHead != null) {
                         best = bestTorsoHead;
                     } else {
-                        // Finally: fallback to general selection by critical first then missing
+                        // Finally: fallback to general selection by critical first then missing (use boosted cap)
                         BodyPart bestGeneral = null;
                         int bestPriority = -1; // 1 = critical, 0 = damaged
                         float bestMissing = 0f;
                         for (BodyPart part : body.getParts()) {
                             float health = part.getHealth();
-                            float max = part.getMaxHealth();
-                            if (health >= max) continue; 
+                            float baseMax = part.getMaxHealth();
+                            float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
+                            float effMax = baseMax + boost;
+                            if (health >= effMax) continue;
                             int priority = (health <= part.getCriticalThreshold() ? 1 : 0);
-                            float missing = max - health;
+                            float missing = effMax - health;
                             if (priority > bestPriority || (priority == bestPriority && missing > bestMissing)) {
                                 bestGeneral = part;
                                 bestPriority = priority;

@@ -131,8 +131,10 @@ public class ServerNetworking {
         buf.writeInt(entity.getId());
 
         var body = ((BodyProvider)entity).getBody();
+        body.prepareBucketSync();
         for (BodyPart part : body.getParts()) {
-            buf.writeIdentifier(part.getIdentifier());
+            Identifier idf = part.getIdentifier();
+            buf.writeIdentifier(idf);
             buf.writeFloat(part.getHealth());
             buf.writeFloat(part.getMaxHealth());
             // bone state
@@ -140,6 +142,9 @@ public class ServerNetworking {
             boolean hasHalf = part.getBrokenTopHalf() != null;
             buf.writeBoolean(hasHalf);
             if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
+            // per-part buckets
+            buf.writeFloat(body.getAbsorptionForPart(idf));
+            buf.writeFloat(body.getBoostForPart(idf));
         }
         // Downed sync (server authoritative)
         buf.writeBoolean(body.isDowned());
@@ -164,14 +169,18 @@ public class ServerNetworking {
     private static void syncSelf(ServerPlayerEntity self) {
         PacketByteBuf buf = PacketByteBufs.create();
         var body = ((BodyProvider) self).getBody();
+        body.prepareBucketSync();
         for (BodyPart part : body.getParts()) {
-            buf.writeIdentifier(part.getIdentifier());
+            Identifier idf = part.getIdentifier();
+            buf.writeIdentifier(idf);
             buf.writeFloat(part.getHealth());
             buf.writeFloat(part.getMaxHealth());
             buf.writeBoolean(part.isBroken());
             boolean hasHalf = part.getBrokenTopHalf() != null;
             buf.writeBoolean(hasHalf);
             if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
+            buf.writeFloat(body.getAbsorptionForPart(idf));
+            buf.writeFloat(body.getBoostForPart(idf));
         }
         buf.writeBoolean(body.isDowned());
         buf.writeInt(body.getBleedOutTicksRemaining());
@@ -202,8 +211,9 @@ public class ServerNetworking {
                 body.onBoneTreatmentApplied();
                 didSomething = true;
             }
-            // Heal some HP as base medkit
-            if (part.getHealth() < part.getMaxHealth()) {
+            // Heal some HP (consider boosted cap as baseline)
+            float effMax = part.getMaxHealth() + Math.max(0.0f, body.getBoostForPart(partID));
+            if (part.getHealth() < effMax) {
                 body.healPart(4, partID);
                 didSomething = true;
             }

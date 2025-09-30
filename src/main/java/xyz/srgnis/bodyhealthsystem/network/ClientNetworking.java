@@ -68,14 +68,19 @@ public class ClientNetworking {
                 boolean broken = buf.readBoolean();
                 boolean hasHalf = buf.readBoolean();
                 boolean topHalf = hasHalf && buf.readBoolean();
+                float partAbs = buf.readFloat();
+                float partBoost = buf.readFloat();
                 client.execute(() -> {
                     if (!(entity instanceof BodyProvider bp)) return;
-                    var part = bp.getBody().getPart(idf);
+                    var body = bp.getBody();
+                    var part = body.getPart(idf);
                     if (part == null) return;
                     part.setMaxHealth(maxhealth);
                     part.setHealth(health);
                     part.setBroken(broken);
                     part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                    body.clientSetAbsorptionBucket(idf, partAbs);
+                    body.clientSetBoostBucket(idf, partBoost);
                 });
             } catch (Exception ex) {
                 buf.readerIndex(readerIndex);
@@ -109,14 +114,19 @@ public class ClientNetworking {
                 boolean broken = buf.readBoolean();
                 boolean hasHalf = buf.readBoolean();
                 boolean topHalf = hasHalf && buf.readBoolean();
+                float partAbs = buf.readFloat();
+                float partBoost = buf.readFloat();
                 client.execute(() -> {
                     if (!(client.player instanceof BodyProvider bp)) return;
-                    var part = bp.getBody().getPart(idf);
+                    var body = bp.getBody();
+                    var part = body.getPart(idf);
                     if (part == null) return;
                     part.setMaxHealth(maxhealth);
                     part.setHealth(health);
                     part.setBroken(broken);
                     part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                    body.clientSetAbsorptionBucket(idf, partAbs);
+                    body.clientSetBoostBucket(idf, partBoost);
                 });
             } catch (Exception ex) {
                 buf.readerIndex(readerIndex);

@@ -34,12 +34,25 @@ public abstract class BodyPart {
     }
 
     public void setHealth(float health) {
-        this.health = Math.min(Math.max(health, 0),maxHealth);
+        float boost = 0.0f;
+        try {
+            if (body != null && identifier != null) {
+                boost = Math.max(0.0f, body.getBoostForPart(identifier));
+            }
+        } catch (Throwable ignored) {}
+        float cap = maxHealth + boost;
+        this.health = Math.min(Math.max(health, 0), cap);
         body.checkNoCritical(this);
     }
 
     public void heal(){
-        setHealth(maxHealth);
+        float boost = 0.0f;
+        try {
+            if (body != null && identifier != null) {
+                boost = Math.max(0.0f, body.getBoostForPart(identifier));
+            }
+        } catch (Throwable ignored) {}
+        setHealth(maxHealth + boost);
     }
 
     public float heal(float amount){
@@ -132,7 +145,13 @@ public abstract class BodyPart {
     }
 
     public boolean isDamaged() {
-        return health < maxHealth;
+        float boost = 0.0f;
+        try {
+            if (body != null && identifier != null) {
+                boost = Math.max(0.0f, body.getBoostForPart(identifier));
+            }
+        } catch (Throwable ignored) {}
+        return health < (maxHealth + boost);
     }
 
     public boolean isBroken() {

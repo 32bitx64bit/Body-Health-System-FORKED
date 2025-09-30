@@ -33,6 +33,8 @@ public abstract class Body {
 
     // When true, skip bone-break evaluation for the current damage application
     protected boolean suppressBoneBreakEvaluation = false;
+    // Track last known vanilla max health to detect Health Boost/attribute changes
+    protected float lastKnownMaxHealth = -1.0f;
 
     // Bone system timers (server authoritative, not persisted)
     protected int boneGraceTicksRemaining = 0; // counts down after a break
@@ -220,14 +222,7 @@ public abstract class Body {
             }
             amount -= consumed;
         }
-        // Then consume from Health Boost bucket (direct max-health increase beyond 20)
-        ensureBoostBucketsUpToDate();
-        float boost = getBoostBucket(part);
-        float bConsumed = Math.min(amount, boost);
-        if (bConsumed > 0.0f) {
-            consumeBoostFromBucket(part, bConsumed);
-            amount -= bConsumed;
-        }
+        // Health Boost is NOT a consumable shield. It increases max health but should not reduce damage here.
         if (amount == 0.0f) {
             return 0.0f;
         }
@@ -505,14 +500,15 @@ public abstract class Body {
         }
 
         // Normal proportional health mapping, with downed threshold fallback
-        float max_health = 0;
+        float max_effective = 0;
         float actual_health = 0;
-        for( BodyPart part : this.getParts()){
-            max_health += part.getMaxHealth();
+        for (BodyPart part : this.getParts()) {
+            float boost = getBoostForPart(part.getIdentifier());
+            max_effective += part.getMaxHealth() + Math.max(0.0f, boost);
             actual_health += part.getHealth();
         }
-        if (max_health > 0) {
-            float ratio = actual_health / max_health;
+        if (max_effective > 0) {
+            float ratio = actual_health / max_effective;
             // If overall health is extremely low, enter downed state (head intact)
             if (ratio <= 0.01f) {
                 startDowned();
@@ -785,8 +781,7 @@ public abstract class Body {
         if (amount <= 0.0f) return;
         var HEAD = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD;
         var TORSO = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO;
-        var limbs = new java.util.ArrayList<BodyPart>();
-        // Head and torso first
+        // Head and torso priority up to 2 each
         BodyPart head = getPart(HEAD);
         BodyPart torso = getPart(TORSO);
         if (head != null && head.getHealth() > 0.0f) {
@@ -805,17 +800,14 @@ public abstract class Body {
                 amount -= add;
             }
         }
-        // Collect alive limbs
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
-
-        if (amount > 0.0f && !limbs.isEmpty()) {
-            float share = amount / (float) limbs.size();
-            for (BodyPart p : limbs) {
+        // Now distribute remaining fairly across all alive parts (including head/torso)
+        java.util.List<BodyPart> alive = new java.util.ArrayList<>();
+        for (BodyPart p : getParts()) {
+            if (p.getHealth() > 0.0f) alive.add(p);
+        }
+        if (amount > 0.0f && !alive.isEmpty()) {
+            float share = amount / (float) alive.size();
+            for (BodyPart p : alive) {
                 Identifier id = p.getIdentifier();
                 float current = absorptionBuckets.getOrDefault(id, 0.0f);
                 absorptionBuckets.put(id, current + share);
@@ -842,27 +834,38 @@ public abstract class Body {
                 }
             }
         }
-        if (reclaim > 0.0f) addBoostToBuckets(reclaim);
+        if (reclaim > 0.0f) addBoostToBuckets(reclaim, false);
 
         float totalBuckets = 0.0f;
         for (Identifier id : boostBuckets.keySet()) totalBuckets += boostBuckets.get(id);
         float extra = Math.max(0.0f, entity.getMaxHealth() - 20.0f);
         if (extra > totalBuckets + 0.001f) {
             float delta = extra - totalBuckets;
-            addBoostToBuckets(delta);
+            addBoostToBuckets(delta, false);
         } else if (extra + 0.001f < totalBuckets) {
             float factor = extra <= 0.0f ? 0.0f : (extra / Math.max(totalBuckets, 0.0001f));
             for (Identifier id : new java.util.ArrayList<>(boostBuckets.keySet())) {
                 boostBuckets.put(id, boostBuckets.get(id) * factor);
             }
         }
+        // Clamp all parts to their current effective caps after any changes
+        clampAllPartsToEffectiveCap();
     }
 
-    protected void addBoostToBuckets(float amount) {
+    private void clampAllPartsToEffectiveCap() {
+        for (BodyPart p : getParts()) {
+            float boost = getBoostForPart(p.getIdentifier());
+            float cap = p.getMaxHealth() + Math.max(0.0f, boost);
+            if (p.getHealth() > cap) {
+                p.setHealth(cap);
+            }
+        }
+    }
+
+    protected void addBoostToBuckets(float amount, boolean grantHealthIgnored) {
         if (amount <= 0.0f) return;
         var HEAD = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD;
         var TORSO = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO;
-        var limbs = new java.util.ArrayList<BodyPart>();
         BodyPart head = getPart(HEAD);
         BodyPart torso = getPart(TORSO);
         if (head != null && head.getHealth() > 0.0f) {
@@ -881,15 +884,14 @@ public abstract class Body {
                 amount -= add;
             }
         }
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT);
-        addAliveIf(limbs, xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
-        if (amount > 0.0f && !limbs.isEmpty()) {
-            float share = amount / (float) limbs.size();
-            for (BodyPart p : limbs) {
+        // Distribute remainder across all alive parts (including head/torso)
+        java.util.List<BodyPart> alive = new java.util.ArrayList<>();
+        for (BodyPart p : getParts()) {
+            if (p.getHealth() > 0.0f) alive.add(p);
+        }
+        if (amount > 0.0f && !alive.isEmpty()) {
+            float share = amount / (float) alive.size();
+            for (BodyPart p : alive) {
                 Identifier id = p.getIdentifier();
                 float current = boostBuckets.getOrDefault(id, 0.0f);
                 boostBuckets.put(id, current + share);
@@ -921,5 +923,46 @@ public abstract class Body {
         float current = boostBuckets.getOrDefault(id, 0.0f);
         float newVal = Math.max(0.0f, current - amount);
         boostBuckets.put(id, newVal);
+    }
+
+    // Expose for networking/UI
+    public void prepareBucketSync() {
+        ensureAbsorptionBucketsUpToDate();
+        ensureBoostBucketsUpToDate();
+    }
+
+    public void clientSetAbsorptionBucket(Identifier id, float value) {
+        absorptionBuckets.put(id, Math.max(0.0f, value));
+    }
+
+    public void clientSetBoostBucket(Identifier id, float value) {
+        boostBuckets.put(id, Math.max(0.0f, value));
+    }
+
+    public float getAbsorptionForPart(Identifier id) {
+        return absorptionBuckets.getOrDefault(id, 0.0f);
+    }
+
+    public float getBoostForPart(Identifier id) {
+        return boostBuckets.getOrDefault(id, 0.0f);
+    }
+
+    // Called on server tick to react to max-health changes (effects/gear)
+    public boolean syncBoostIfNeeded() {
+        float current = (entity != null) ? entity.getMaxHealth() : 0.0f;
+        if (lastKnownMaxHealth < 0.0f) {
+            lastKnownMaxHealth = current;
+            ensureBoostBucketsUpToDate();
+            clampAllPartsToEffectiveCap();
+            return true;
+        }
+        if (Math.abs(current - lastKnownMaxHealth) > 0.01f) {
+            lastKnownMaxHealth = current;
+            ensureBoostBucketsUpToDate();
+            clampAllPartsToEffectiveCap();
+            updateHealth();
+            return true;
+        }
+        return false;
     }
 }

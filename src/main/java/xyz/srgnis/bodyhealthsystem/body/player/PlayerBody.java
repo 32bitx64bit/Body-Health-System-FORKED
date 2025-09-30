@@ -124,14 +124,7 @@ public class PlayerBody extends Body {
             player.increaseStat(Stats.DAMAGE_ABSORBED, Math.round(consumed * 10.0f));
             amount -= consumed;
         }
-        // Then consume from Health Boost bucket (direct max health increase beyond 20)
-        ensureBoostBucketsUpToDate();
-        float boost = getBoostBucket(part);
-        float bConsumed = Math.min(amount, boost);
-        if (bConsumed > 0.0f) {
-            consumeBoostFromBucket(part, bConsumed);
-            amount -= bConsumed;
-        }
+        // Health Boost is NOT a consumable shield. It increases max health but should not reduce damage here.
         if (amount == 0.0f) {
             return 0.0f;
         }

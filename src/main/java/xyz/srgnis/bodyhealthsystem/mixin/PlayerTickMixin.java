@@ -90,6 +90,11 @@ public class PlayerTickMixin {
                 return;
             }
 
+            // Update per-part Health Boost distribution if vanilla max health changed
+            if (body.syncBoostIfNeeded()) {
+                ServerNetworking.broadcastBody(player);
+            }
+
             BodyPart head = body.getPart(PlayerBodyParts.HEAD);
             if (player.isAlive()) {
                 if (player.getHealth() <= 0.0f && head != null && head.getHealth() > 0.0f && !body.isDowned()) {

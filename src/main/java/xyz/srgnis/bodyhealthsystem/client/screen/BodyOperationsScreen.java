@@ -5,6 +5,8 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.LivingEntity;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
@@ -96,6 +98,12 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             boneLayerWasEnabledOnOpen = true;
             BONE_LAYER_ENABLED = false;
             disabledByMedkit = true;
+        }
+        // Request fresh body data from server so per-part buckets are up-to-date
+        if (this.handler.getEntity() != null) {
+            var buf = PacketByteBufs.create();
+            buf.writeInt(this.handler.getEntity().getId());
+            ClientPlayNetworking.send(BHSMain.id("data_request"), buf);
         }
         computeBodyScale();
         addWidgets();
@@ -260,21 +268,13 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                     if (part != null) {
                         java.util.List<Text> list = new java.util.ArrayList<>();
                         list.add(Text.literal(part.getIdentifier().getPath()));
-                        list.add(Text.literal("" + Math.round(part.getHealth()) + "/" + Math.round(part.getMaxHealth())));
-                        float totalAbs = handler.getEntity() != null ? handler.getEntity().getAbsorptionAmount() : 0.0f;
-                        if (totalAbs > 0.0f) {
-                            float alloc = allocatedAbsorptionFor(handler.getBody(), part.getIdentifier(), totalAbs);
-                            if (alloc > 0.0f) list.add(Text.literal("Absorption: " + Math.round(alloc)));
-                        }
-                        // Direct extra HP from max health (Health Boost or attributes)
-                        float extraHP = 0.0f;
-                        if (handler.getEntity() != null) {
-                            extraHP = Math.max(0.0f, handler.getEntity().getMaxHealth() - 20.0f);
-                        }
-                        if (extraHP > 0.0f) {
-                            float hbAlloc = allocatedAbsorptionFor(handler.getBody(), part.getIdentifier(), extraHP);
-                            if (hbAlloc > 0.0f) list.add(Text.literal("Health Boost: " + Math.round(hbAlloc)));
-                        }
+                        float boost = handler.getBody().getBoostForPart(part.getIdentifier());
+                        float effMax = part.getMaxHealth() + Math.max(0.0f, boost);
+                        list.add(Text.literal("" + Math.round(part.getHealth()) + "/" + Math.round(effMax)));
+                        float allocAbs = handler.getBody().getAbsorptionForPart(part.getIdentifier());
+                        if (allocAbs > 0.0f) list.add(Text.literal("Absorption: " + Math.round(allocAbs)));
+                        float hbAlloc = handler.getBody().getBoostForPart(part.getIdentifier());
+                        if (hbAlloc > 0.0f) list.add(Text.literal("Health Boost: " + Math.round(hbAlloc)));
                         if (part.isBroken()) list.add(Text.literal("Broken"));
                         drawContext.drawTooltip(this.textRenderer, list, mouseX, mouseY);
                     }
@@ -371,8 +371,9 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         String rfStr = formatHealth(rf);
         int lfTextW = tr.getWidth(lfStr);
         int rfTextW = tr.getWidth(rfStr);
-        int lfX = baseX + sx(GUIConstants.SCALED_LEFT_FOOT_X_OFFSET) + (sx(GUIConstants.SCALED_LEFT_FOOT_WIDTH) - lfTextW) / 2;
-        int rfX = baseX + sx(GUIConstants.SCALED_RIGHT_FOOT_X_OFFSET) + (sx(GUIConstants.SCALED_RIGHT_FOOT_WIDTH) - rfTextW) / 2;
+        int sep = Math.max(2, Math.round(3 * DRAW_SCALE));
+        int lfX = baseX + sx(GUIConstants.SCALED_LEFT_FOOT_X_OFFSET) + (sx(GUIConstants.SCALED_LEFT_FOOT_WIDTH) - lfTextW) / 2 - sep;
+        int rfX = baseX + sx(GUIConstants.SCALED_RIGHT_FOOT_X_OFFSET) + (sx(GUIConstants.SCALED_RIGHT_FOOT_WIDTH) - rfTextW) / 2 + sep;
         int feetY = baseY + sy(GUIConstants.SCALED_LEFT_FOOT_Y_OFFSET) + sy(GUIConstants.SCALED_LEFT_FOOT_HEIGHT) + 2;
         ctx.drawTextWithShadow(tr, lfStr, lfX, feetY, white);
         ctx.drawTextWithShadow(tr, rfStr, rfX, feetY, white);
@@ -431,70 +432,15 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     }
 
     private String formatHealth(BodyPart p) {
-        if (p == null) return "0";
-        int hp = Math.round(p.getHealth());
-        LivingEntity target = this.handler.getEntity();
-        float totalAbs = target != null ? target.getAbsorptionAmount() : 0.0f;
-        float extraHP = target != null ? Math.max(0.0f, target.getMaxHealth() - 20.0f) : 0.0f;
-        float addAbs = 0.0f;
-        if (totalAbs > 0.0f) {
-            addAbs = allocatedAbsorptionFor(this.handler.getBody(), p.getIdentifier(), totalAbs);
-        }
-        float addHB = 0.0f;
-        if (extraHP > 0.0f) {
-            addHB = allocatedAbsorptionFor(this.handler.getBody(), p.getIdentifier(), extraHP);
-        }
-        int add = Math.round(addAbs + addHB);
-        if (add > 0) {
-            return hp + " (+" + add + ")";
-        }
-        return String.valueOf(hp);
+        if (p == null) return "0/0";
+        Body body = this.handler.getBody();
+        float boost = body.getBoostForPart(p.getIdentifier());
+        float current = p.getHealth();
+        float maxEff = p.getMaxHealth() + Math.max(0.0f, boost);
+        return Math.round(current) + "/" + Math.round(maxEff);
     }
 
-    // Deterministic client-side allocation for display (mirrors server priority rules)
-    private static float allocatedAbsorptionFor(Body body, Identifier partId, float total) {
-        if (body == null || total <= 0.0f) return 0.0f;
-        BodyPart part = body.getPart(partId);
-        if (part == null || part.getHealth() <= 0.0f) return 0.0f;
-        Identifier HEAD = PlayerBodyParts.HEAD;
-        Identifier TORSO = PlayerBodyParts.TORSO;
-        float headCap = 2.0f;
-        float torsoCap = 2.0f;
-
-        float toHead = 0.0f;
-        BodyPart head = body.getPart(HEAD);
-        if (head != null && head.getHealth() > 0.0f) {
-            toHead = Math.min(headCap, total);
-        }
-        if (partId.equals(HEAD)) return toHead;
-        float remAfterHead = Math.max(0.0f, total - toHead);
-
-        float toTorso = 0.0f;
-        BodyPart torso = body.getPart(TORSO);
-        if (torso != null && torso.getHealth() > 0.0f) {
-            toTorso = Math.min(torsoCap, remAfterHead);
-        }
-        if (partId.equals(TORSO)) return toTorso;
-        float rem = Math.max(0.0f, remAfterHead - toTorso);
-        if (rem <= 0.0f) return 0.0f;
-
-        java.util.List<BodyPart> limbs = new java.util.ArrayList<>();
-        addAlive(limbs, body, PlayerBodyParts.LEFT_ARM);
-        addAlive(limbs, body, PlayerBodyParts.RIGHT_ARM);
-        addAlive(limbs, body, PlayerBodyParts.LEFT_LEG);
-        addAlive(limbs, body, PlayerBodyParts.RIGHT_LEG);
-        addAlive(limbs, body, PlayerBodyParts.LEFT_FOOT);
-        addAlive(limbs, body, PlayerBodyParts.RIGHT_FOOT);
-        if (limbs.isEmpty()) return 0.0f;
-        float share = rem / (float) limbs.size();
-        for (BodyPart bp : limbs) if (bp.getIdentifier().equals(partId)) return share;
-        return 0.0f;
-    }
-
-    private static void addAlive(java.util.List<BodyPart> list, Body body, Identifier id) {
-        BodyPart p = body.getPart(id);
-        if (p != null && p.getHealth() > 0.0f) list.add(p);
-    }
+    // No client-side allocation logic anymore; we use server-synced buckets for display
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {

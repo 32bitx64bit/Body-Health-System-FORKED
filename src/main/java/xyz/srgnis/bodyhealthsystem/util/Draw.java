@@ -19,7 +19,16 @@ public class Draw {
     private static final int TEMP_COLD = 0xff1b50ee;
 
     public static int selectHealthColor(BodyPart part){
-        float percent = part.getHealth()/part.getMaxHealth();
+        float boost = 0.0f;
+        try {
+            if (part != null && part.getIdentifier() != null && ((xyz.srgnis.bodyhealthsystem.body.player.BodyProvider) part.getEntity()).getBody() != null) {
+                var body = ((xyz.srgnis.bodyhealthsystem.body.player.BodyProvider) part.getEntity()).getBody();
+                boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
+            }
+        } catch (Throwable ignored) {}
+        float effectiveMax = part.getMaxHealth() + boost;
+        if (effectiveMax <= 0.0f) return gray;
+        float percent = part.getHealth() / effectiveMax;
         if(percent>=1){
             return dark_green;
         }
