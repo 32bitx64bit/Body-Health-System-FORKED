@@ -82,6 +82,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     private long lastUpdateNanos = 0L;
     private long lastTempRequestNanos = 0L;
     private ButtonWidget tempToggleBtn;
+    private ButtonWidget boneToggleBtn;
 
     public BodyOperationsScreen(BodyOperationsScreenHandler handler, PlayerInventory inventory, Text title) {
         super(handler, inventory, title);
@@ -93,6 +94,12 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     @Override
     protected void init() {
         super.init();
+        // Enforce bone system disabled: force bone layer off and block medkit override
+        if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
+            BONE_LAYER_ENABLED = false;
+            boneLayerWasEnabledOnOpen = false;
+            disabledByMedkit = false;
+        }
         // If opened with an item (medkit), disable bone layer if it was enabled, remember to restore on successful use
         if (!this.handler.getItemStack().isEmpty() && BONE_LAYER_ENABLED) {
             boneLayerWasEnabledOnOpen = true;
@@ -148,9 +155,16 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int btnH = Math.round(20 * DRAW_SCALE);
         int btnX = rpLeft + Math.max(0, (Math.round(RIGHT_PANEL_W * DRAW_SCALE) - btnW) / 2);
         int btnY = rpTop;
-        addDrawableChild(ButtonWidget.builder(Text.literal("Bone Layer"), b -> {
+        boneToggleBtn = ButtonWidget.builder(Text.literal("Bone Layer"), b -> {
+            if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
+                // Enforce off when system disabled
+                BONE_LAYER_ENABLED = false;
+                return;
+            }
             BONE_LAYER_ENABLED = !BONE_LAYER_ENABLED;
-        }).dimensions(btnX, btnY, btnW, btnH).build());
+        }).dimensions(btnX, btnY, btnW, btnH).build();
+        boneToggleBtn.active = xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem;
+        addDrawableChild(boneToggleBtn);
 
         int btnY2 = btnY + btnH + Math.round(6 * DRAW_SCALE);
         tempToggleBtn = ButtonWidget.builder(Text.literal(showTemperature ? "Show Health" : "Show Temp"), b -> {
@@ -258,6 +272,13 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
 
         this.renderBackground(drawContext);
         super.render(drawContext, mouseX, mouseY, delta);
+        // Enforce bone overlay toggle state based on config
+        if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
+            BONE_LAYER_ENABLED = false;
+            if (boneToggleBtn != null) boneToggleBtn.active = false;
+        } else {
+            if (boneToggleBtn != null) boneToggleBtn.active = true;
+        }
         // Numbers overlay
         drawNumbers(drawContext);
         // Tooltips for parts (only when showing health)
@@ -288,7 +309,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     public void close() {
         // If this screen was opened with a medkit and we auto-disabled the bone layer,
         // restore it on close to the previous state (ensures bones reappear next open).
-        if (disabledByMedkit && boneLayerWasEnabledOnOpen) {
+        if (disabledByMedkit && boneLayerWasEnabledOnOpen && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
             BONE_LAYER_ENABLED = true;
         }
         super.close();
@@ -385,6 +406,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         drawHealthRectangle(ctx, x, y, w, h, color);
 
         if (showTemperature) return; // no bone overlay in temperature mode
+        if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) return;
         if (!BONE_LAYER_ENABLED) return;
 
         boolean broken = p.isBroken();
@@ -470,7 +492,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             ClientNetworking.useHealingItem(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier(), BodyOperationsScreen.this.handler.getItemStack());
             usedMedkit = true;
             // Restore bone layer if we auto-disabled it when opening for medkit
-            if (disabledByMedkit && boneLayerWasEnabledOnOpen) {
+            if (disabledByMedkit && boneLayerWasEnabledOnOpen && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
                 BONE_LAYER_ENABLED = true;
             }
             BodyOperationsScreen.this.close();
