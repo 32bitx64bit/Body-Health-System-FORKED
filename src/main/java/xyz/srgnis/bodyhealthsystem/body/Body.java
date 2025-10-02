@@ -335,109 +335,44 @@ public abstract class Body {
         }
 
 
-        // Slowness: each broken bone adds +1 amplifier level (amplifier is level-1)
-        int brokenCount = brokenBonesCount();
-        if (brokenCount > 0) {
-            int amp = Math.max(0, brokenCount - 1);
-            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, amp, false, false, false));
+        // Tick per-bone timers and apply new Broken Bone status effect 15s after break
+        int totalBroken = 0;
+        for (BodyPart p : getParts()) {
+            if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
+            if (p.isBroken()) {
+                p.tickBroken();
+                totalBroken++;
+            }
         }
-
-        // Arms: mining fatigue
-        int brokenArms = countBrokenArms();
-        if (brokenArms > 0) {
-            int amp = Math.max(0, brokenArms - 1);
-            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE, 40, amp, false, false, false));
-        }
-
-        // Torso: weakness II when torso bone is broken
-        if (isTorsoBroken()) {
-            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.WEAKNESS, 40, 1, false, false, false));
-        }
-
-        // Feet: if BOTH feet are broken, add Slowness I extra (stacks with overall slowness)
-        if (bothFeetBroken()) {
-            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    net.minecraft.entity.effect.StatusEffects.SLOWNESS, 40, 0, false, false, false));
-        }
-
-        // Apply/refresh the bleeding indicator: show during last 10s of grace and while bleeding is active
-        boolean showBleeding = bonePenaltyActive || (!bonePenaltyActive && boneGraceTicksRemaining <= 200);
-        if (showBleeding) {
-            player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
-                    ModStatusEffects.BLEEDING_EFFECT, 40, 0, false, true, true));
+        // Apply Broken Bone status effect with amplifier = min(totalBroken, 3) - 1 (i.e., I..III caps at 3)
+        if (totalBroken > 0) {
+            int stacks = Math.min(3, totalBroken);
+            // Only kick in after 15s since the first broken bone (use min brokenTicks across parts)
+            int minBrokenTicks = Integer.MAX_VALUE;
+            for (BodyPart p : getParts()) {
+                if (!p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && p.isBroken()) {
+                    minBrokenTicks = Math.min(minBrokenTicks, p.getBrokenTicks());
+                }
+            }
+            if (minBrokenTicks >= 300) { // 15 seconds at 20 tps
+                player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                        ModStatusEffects.BROKEN_BONE, 40, stacks - 1, false, true, true));
+            } else {
+                player.removeStatusEffect(ModStatusEffects.BROKEN_BONE);
+            }
         } else {
-            player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);
+            player.removeStatusEffect(ModStatusEffects.BROKEN_BONE);
         }
+
+        // Retain BLEEDING_EFFECT for future use; do not manage/display it here anymore
 
         // Periodic health penalty once grace elapsed
+        // Keeping structure for future re-use if needed.
         if (bonePenaltyActive) {
             bonePenaltyTickCounter++;
-            if (bonePenaltyTickCounter >= 200) { // every 10 seconds
+            if (bonePenaltyTickCounter >= 200) {
                 bonePenaltyTickCounter = 0;
-                int stacks = brokenBonesCount();
-                if (stacks > 0) {
-                    float dmg = 0.5f * stacks;
-
-                    BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
-                    java.util.List<BodyPart> aliveNonHeadNonTorso = new java.util.ArrayList<>();
-                    for (BodyPart p : getParts()) {
-                        var id = p.getIdentifier();
-                        if (!id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)
-                                && !id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO)
-                                && p.getHealth() > 0.0f) {
-                            aliveNonHeadNonTorso.add(p);
-                        }
-                    }
-
-                    boolean othersDestroyed = allOtherNonHeadPartsDestroyed();
-
-                    BodyPart target = null;
-                    // If torso is at/below 2 HP and not all other parts are destroyed, avoid using torso
-                    if (torso != null && torso.getHealth() <= 2.0f && !othersDestroyed) {
-                        if (!aliveNonHeadNonTorso.isEmpty()) {
-                            target = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
-                        }
-                    } else {
-                        // Prefer torso otherwise; if unsuitable, pick a random other alive part
-                        target = torso;
-                        if (target == null || target.getHealth() <= 0.0f) {
-                            if (!aliveNonHeadNonTorso.isEmpty()) {
-                                target = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
-                            }
-                        }
-                    }
-
-                    if (target != null) {
-                        if (target == torso && torso != null && torso.getHealth() > 0.0f && !othersDestroyed && torso.getHealth() <= 2.0f) {
-                            // Shouldn't happen due to selection, but guard anyway
-                            if (!aliveNonHeadNonTorso.isEmpty()) {
-                                BodyPart reroute = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
-                                applyBleedingDamageTo(player, reroute, dmg);
-                            }
-                        } else if (target == torso && torso != null && !othersDestroyed && torso.getHealth() > 2.0f) {
-                            // Clamp torso damage so it never drops below 2 HP while others are not destroyed
-                            float allowed = Math.max(0.0f, torso.getHealth() - 2.0f);
-                            float toTorso = Math.min(dmg, allowed);
-                            float remainder = dmg - toTorso;
-                            if (toTorso > 0.0f) {
-                                applyBleedingDamageTo(player, torso, toTorso);
-                            }
-                            if (remainder > 0.0f && !aliveNonHeadNonTorso.isEmpty()) {
-                                BodyPart reroute = aliveNonHeadNonTorso.get(entity.getRandom().nextInt(aliveNonHeadNonTorso.size()));
-                                applyBleedingDamageTo(player, reroute, remainder);
-                            }
-                        } else {
-                            // Normal application
-                            applyBleedingDamageTo(player, target, dmg);
-                        }
-                        updateHealth();
-                        // Sync to clients so their HUD reflects the tick damage
-                        ServerNetworking.broadcastBody(player);
-                    }
-                }
+                // no periodic damage here anymore
             }
         }
     }

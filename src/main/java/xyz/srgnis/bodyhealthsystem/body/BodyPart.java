@@ -17,6 +17,8 @@ public abstract class BodyPart {
     private Boolean brokenTopHalf = null;
     // Sleep healing: accumulated bonus chance to heal this bone on wake-up
     private float sleepHealBonus = 0.0f;
+    // Ticks since this bone became broken (server-authoritative); used for delayed broken-bone effect
+    private int brokenTicks = 0;
 
     protected float criticalThreshold;
     private LivingEntity entity;
@@ -125,6 +127,7 @@ public abstract class BodyPart {
         new_nbt.putBoolean("broken", broken);
         if (brokenTopHalf != null) new_nbt.putBoolean("brokenTopHalf", brokenTopHalf);
         if (sleepHealBonus > 0.0f) new_nbt.putFloat("sleepHealBonus", sleepHealBonus);
+        if (broken && brokenTicks > 0) new_nbt.putInt("brokenTicks", brokenTicks);
         nbt.put(identifier.toString(), new_nbt);
     }
 
@@ -144,6 +147,11 @@ public abstract class BodyPart {
             sleepHealBonus = nbt.getFloat("sleepHealBonus");
         } else {
             sleepHealBonus = 0.0f;
+        }
+        if (broken && nbt.contains("brokenTicks")) {
+            brokenTicks = nbt.getInt("brokenTicks");
+        } else {
+            brokenTicks = 0;
         }
     }
 
@@ -171,6 +179,10 @@ public abstract class BodyPart {
         if (!broken) {
             // Reset accumulated sleep bonus when healed
             this.sleepHealBonus = 0.0f;
+            this.brokenTicks = 0;
+        } else {
+            // Reset age on new break
+            this.brokenTicks = 0;
         }
     }
 
@@ -185,6 +197,9 @@ public abstract class BodyPart {
     public float getSleepHealBonus() {
         return sleepHealBonus;
     }
+
+    public int getBrokenTicks() { return brokenTicks; }
+    public void tickBroken() { if (broken && brokenTicks < Integer.MAX_VALUE) brokenTicks++; }
 
     public void setSleepHealBonus(float bonus) {
         this.sleepHealBonus = Math.max(0.0f, Math.min(1.0f, bonus));

@@ -22,6 +22,7 @@
   "effect.bodyhealthsystem.mildhypo": "Hypothermia (Mild)",
   "effect.bodyhealthsystem.modhypo": "Hypothermia (Moderate)",
   "effect.bodyhealthsystem.servhypo": "Hypothermia (Severe)",
+  "effect.bodyhealthsystem.broken_bone": "Broken Bone",
 
   "bodyhealthsystem.midnightconfig.title": "Body Health System",
 
