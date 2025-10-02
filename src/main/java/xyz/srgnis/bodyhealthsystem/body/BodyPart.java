@@ -19,6 +19,8 @@ public abstract class BodyPart {
     private float sleepHealBonus = 0.0f;
     // Ticks since this bone became broken (server-authoritative); used for delayed broken-bone effect
     private int brokenTicks = 0;
+    // After prolonged time broken, the fracture becomes severe: part cannot be healed by simple items
+    private boolean fractureLocked = false;
 
     protected float criticalThreshold;
     private LivingEntity entity;
@@ -128,6 +130,7 @@ public abstract class BodyPart {
         if (brokenTopHalf != null) new_nbt.putBoolean("brokenTopHalf", brokenTopHalf);
         if (sleepHealBonus > 0.0f) new_nbt.putFloat("sleepHealBonus", sleepHealBonus);
         if (broken && brokenTicks > 0) new_nbt.putInt("brokenTicks", brokenTicks);
+        if (fractureLocked) new_nbt.putBoolean("fractureLocked", true);
         nbt.put(identifier.toString(), new_nbt);
     }
 
@@ -152,6 +155,11 @@ public abstract class BodyPart {
             brokenTicks = nbt.getInt("brokenTicks");
         } else {
             brokenTicks = 0;
+        }
+        if (nbt.contains("fractureLocked")) {
+            fractureLocked = nbt.getBoolean("fractureLocked");
+        } else {
+            fractureLocked = false;
         }
     }
 
@@ -180,6 +188,7 @@ public abstract class BodyPart {
             // Reset accumulated sleep bonus when healed
             this.sleepHealBonus = 0.0f;
             this.brokenTicks = 0;
+            this.fractureLocked = false;
         } else {
             // Reset age on new break
             this.brokenTicks = 0;
@@ -200,6 +209,9 @@ public abstract class BodyPart {
 
     public int getBrokenTicks() { return brokenTicks; }
     public void tickBroken() { if (broken && brokenTicks < Integer.MAX_VALUE) brokenTicks++; }
+
+    public boolean isFractureLocked() { return fractureLocked; }
+    public void setFractureLocked(boolean locked) { this.fractureLocked = locked; }
 
     public void setSleepHealBonus(float bonus) {
         this.sleepHealBonus = Math.max(0.0f, Math.min(1.0f, bonus));

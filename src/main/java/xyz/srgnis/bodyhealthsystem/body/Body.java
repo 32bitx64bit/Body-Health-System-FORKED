@@ -337,24 +337,35 @@ public abstract class Body {
 
         // Tick per-bone timers and apply new Broken Bone status effect 15s after break
         int totalBroken = 0;
+        boolean boneStateChanged = false;
         for (BodyPart p : getParts()) {
             if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             if (p.isBroken()) {
                 p.tickBroken();
+                // After ~2 minutes (2400 ticks), fully break and lock fracture (non-healable by simple items)
+                if (p.getBrokenTicks() == 2400 && !p.isFractureLocked()) {
+                    if (p.getHealth() > 0.0f) p.setHealth(0.0f);
+                    p.setFractureLocked(true);
+                    boneStateChanged = true;
+                }
                 totalBroken++;
             }
+        }
+        if (boneStateChanged) {
+            // Sync new locked state to the player and watchers
+            xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(player);
         }
         // Apply Broken Bone status effect with amplifier = min(totalBroken, 3) - 1 (i.e., I..III caps at 3)
         if (totalBroken > 0) {
             int stacks = Math.min(3, totalBroken);
             // Only kick in after 15s since the first broken bone (use min brokenTicks across parts)
-            int minBrokenTicks = Integer.MAX_VALUE;
+            int maxBrokenTicks = 0;
             for (BodyPart p : getParts()) {
                 if (!p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && p.isBroken()) {
-                    minBrokenTicks = Math.min(minBrokenTicks, p.getBrokenTicks());
+                    maxBrokenTicks = Math.max(maxBrokenTicks, p.getBrokenTicks());
                 }
             }
-            if (minBrokenTicks >= 300) { // 15 seconds at 20 tps
+            if (maxBrokenTicks >= 300) { // 15 seconds at 20 tps
                 player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
                         ModStatusEffects.BROKEN_BONE, 40, stacks - 1, false, true, true));
             } else {

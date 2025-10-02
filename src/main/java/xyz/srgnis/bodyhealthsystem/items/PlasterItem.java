@@ -30,6 +30,82 @@ public class PlasterItem extends Item {
         super(settings);
     }
 
+    // Determine the best body part to heal with plaster, skipping permanently locked fractures
+    private BodyPart findBestPlasterTarget(Body body) {
+        BodyPart best = null;
+
+        // First: if any BROKEN parts exist, heal the most missing among them (use boosted cap), skip locked
+        BodyPart bestBroken = null;
+        float brokenMissing = 0f;
+        for (BodyPart part : body.getParts()) {
+            float health = part.getHealth();
+            float baseMax = part.getMaxHealth();
+            float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
+            float effMax = baseMax + boost;
+            if (health <= 0f && !part.isFractureLocked()) {
+                float missing = effMax - health;
+                if (bestBroken == null || missing > brokenMissing) {
+                    bestBroken = part;
+                    brokenMissing = missing;
+                }
+            }
+        }
+        if (bestBroken != null) return bestBroken;
+
+        // Second: prioritize torso/head if damaged (use boosted cap), skip locked
+        BodyPart bestTorsoHead = null;
+        int bestTHPriority = -1; // 1 = critical, 0 = damaged
+        float bestTHMissing = 0f;
+        for (BodyPart part : body.getParts()) {
+            if (!part.getIdentifier().equals(PlayerBodyParts.HEAD) && !part.getIdentifier().equals(PlayerBodyParts.TORSO)) continue;
+            if (part.isFractureLocked()) continue;
+            float health = part.getHealth();
+            float baseMax = part.getMaxHealth();
+            float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
+            float effMax = baseMax + boost;
+            if (health >= effMax) continue; // not damaged
+            int priority = (health <= part.getCriticalThreshold()) ? 1 : 0;
+            float missing = effMax - health;
+            if (priority > bestTHPriority || (priority == bestTHPriority && missing > bestTHMissing)) {
+                bestTorsoHead = part;
+                bestTHPriority = priority;
+                bestTHMissing = missing;
+            }
+        }
+        if (bestTorsoHead != null) return bestTorsoHead;
+
+        // Finally: fallback to general selection by critical first then missing (use boosted cap), skip locked
+        BodyPart bestGeneral = null;
+        int bestPriority = -1; // 1 = critical, 0 = damaged
+        float bestMissing = 0f;
+        for (BodyPart part : body.getParts()) {
+            if (part.isFractureLocked()) continue;
+            float health = part.getHealth();
+            float baseMax = part.getMaxHealth();
+            float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
+            float effMax = baseMax + boost;
+            if (health >= effMax) continue;
+            int priority = (health <= part.getCriticalThreshold() ? 1 : 0);
+            float missing = effMax - health;
+            if (priority > bestPriority || (priority == bestPriority && missing > bestMissing)) {
+                bestGeneral = part;
+                bestPriority = priority;
+                bestMissing = missing;
+            }
+        }
+        return bestGeneral;
+    }
+
+    private boolean canUseOnTarget(LivingEntity target) {
+        if (target instanceof BodyProvider) {
+            Body body = ((BodyProvider) target).getBody();
+            BodyPart candidate = findBestPlasterTarget(body);
+            return candidate != null;
+        } else {
+            return target.getHealth() < target.getMaxHealth();
+        }
+    }
+
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
@@ -38,12 +114,20 @@ public class PlasterItem extends Item {
             tag.remove(TARGET_NBT);
             if (tag.isEmpty()) stack.setNbt(null);
         }
+        // Only begin using (start animation) if there is a valid target to heal
+        if (!canUseOnTarget(user)) {
+            return TypedActionResult.fail(stack);
+        }
         user.setCurrentHand(hand);
         return TypedActionResult.consume(stack);
     }
 
     @Override
     public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
+        // Only start using on the entity if it can actually be treated
+        if (!canUseOnTarget(entity)) {
+            return ActionResult.PASS;
+        }
         NbtCompound tag = stack.getOrCreateNbt();
         tag.putInt(TARGET_NBT, entity.getId());
         user.setCurrentHand(hand);
@@ -78,76 +162,12 @@ public class PlasterItem extends Item {
 
             if (target instanceof BodyProvider) {
                 Body body = ((BodyProvider) target).getBody();
-                BodyPart best = null;
-
-                // First: if any broken parts exist, heal the most missing among them (use boosted cap)
-                BodyPart bestBroken = null;
-                float brokenMissing = 0f;
-                for (BodyPart part : body.getParts()) {
-                    float health = part.getHealth();
-                    float baseMax = part.getMaxHealth();
-                    float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
-                    float effMax = baseMax + boost;
-                    if (health <= 0f) {
-                        float missing = effMax - health;
-                        if (bestBroken == null || missing > brokenMissing) {
-                            bestBroken = part;
-                            brokenMissing = missing;
-                        }
-                    }
-                }
-
-                if (bestBroken != null) {
-                    best = bestBroken;
-                } else {
-                    // Second: prioritize torso/head if damaged (use boosted cap)
-                    BodyPart bestTorsoHead = null;
-                    int bestTHPriority = -1; // 1 = critical, 0 = damaged
-                    float bestTHMissing = 0f;
-                    for (BodyPart part : body.getParts()) {
-                        if (!part.getIdentifier().equals(PlayerBodyParts.HEAD) && !part.getIdentifier().equals(PlayerBodyParts.TORSO)) continue;
-                        float health = part.getHealth();
-                        float baseMax = part.getMaxHealth();
-                        float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
-                        float effMax = baseMax + boost;
-                        if (health >= effMax) continue; // not damaged
-                        int priority = (health <= part.getCriticalThreshold()) ? 1 : 0;
-                        float missing = effMax - health;
-                        if (priority > bestTHPriority || (priority == bestTHPriority && missing > bestTHMissing)) {
-                            bestTorsoHead = part;
-                            bestTHPriority = priority;
-                            bestTHMissing = missing;
-                        }
-                    }
-                    if (bestTorsoHead != null) {
-                        best = bestTorsoHead;
-                    } else {
-                        // Finally: fallback to general selection by critical first then missing (use boosted cap)
-                        BodyPart bestGeneral = null;
-                        int bestPriority = -1; // 1 = critical, 0 = damaged
-                        float bestMissing = 0f;
-                        for (BodyPart part : body.getParts()) {
-                            float health = part.getHealth();
-                            float baseMax = part.getMaxHealth();
-                            float boost = Math.max(0.0f, body.getBoostForPart(part.getIdentifier()));
-                            float effMax = baseMax + boost;
-                            if (health >= effMax) continue;
-                            int priority = (health <= part.getCriticalThreshold() ? 1 : 0);
-                            float missing = effMax - health;
-                            if (priority > bestPriority || (priority == bestPriority && missing > bestMissing)) {
-                                bestGeneral = part;
-                                bestPriority = priority;
-                                bestMissing = missing;
-                            }
-                        }
-                        best = bestGeneral;
-                    }
-                }
+                BodyPart best = findBestPlasterTarget(body);
 
                 if (best != null) {
                     float healValue = HEAL_AMOUNT;
                     if (target.hasStatusEffect(ModStatusEffects.DRESSING_EFFECT)) {
-                        healValue *= 2.0f; 
+                        healValue *= 2.0f;
                         target.removeStatusEffect(ModStatusEffects.DRESSING_EFFECT);
                     }
                     float before = best.getHealth();
@@ -165,8 +185,8 @@ public class PlasterItem extends Item {
                 }
             }
 
-            // Fallback to vanilla heal if not a BodyProvider or nothing selected
-            if (!consumed && target.getHealth() < target.getMaxHealth()) {
+            // Fallback to vanilla heal ONLY for non-body entities
+            if (!consumed && !(target instanceof BodyProvider) && target.getHealth() < target.getMaxHealth()) {
                 float healValue = HEAL_AMOUNT;
                 if (target.hasStatusEffect(ModStatusEffects.DRESSING_EFFECT)) {
                     healValue *= 2.0f;

@@ -142,6 +142,8 @@ public class ServerNetworking {
             boolean hasHalf = part.getBrokenTopHalf() != null;
             buf.writeBoolean(hasHalf);
             if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
+            // fracture locked flag
+            buf.writeBoolean(part.isFractureLocked());
             // per-part buckets
             buf.writeFloat(body.getAbsorptionForPart(idf));
             buf.writeFloat(body.getBoostForPart(idf));
@@ -179,6 +181,7 @@ public class ServerNetworking {
             boolean hasHalf = part.getBrokenTopHalf() != null;
             buf.writeBoolean(hasHalf);
             if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
+            buf.writeBoolean(part.isFractureLocked());
             buf.writeFloat(body.getAbsorptionForPart(idf));
             buf.writeFloat(body.getBoostForPart(idf));
         }
@@ -207,6 +210,7 @@ public class ServerNetworking {
             if (part.isBroken()) {
                 part.setBroken(false);
                 part.setBrokenTopHalf(null);
+                part.setFractureLocked(false);
                 part.setHealth(Math.max(1.0f, part.getHealth()));
                 body.onBoneTreatmentApplied();
                 didSomething = true;
@@ -231,6 +235,10 @@ public class ServerNetworking {
 
         // Default medkit behaviour: heal only when damaged
         if (part.isDamaged()) {
+            // Do not allow healing if fracture has locked (requires upgraded medkit)
+            if (part.isFractureLocked()) {
+                return;
+            }
             body.healPart(4, partID);
             if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
                 serverPlayerEntity.getInventory().getMainHandStack().decrement(1);

@@ -68,6 +68,7 @@ public class ClientNetworking {
                 boolean broken = buf.readBoolean();
                 boolean hasHalf = buf.readBoolean();
                 boolean topHalf = hasHalf && buf.readBoolean();
+                boolean fractureLocked = buf.readBoolean();
                 float partAbs = buf.readFloat();
                 float partBoost = buf.readFloat();
                 client.execute(() -> {
@@ -79,6 +80,7 @@ public class ClientNetworking {
                     part.setHealth(health);
                     part.setBroken(broken);
                     part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                    part.setFractureLocked(fractureLocked);
                     body.clientSetAbsorptionBucket(idf, partAbs);
                     body.clientSetBoostBucket(idf, partBoost);
                 });
@@ -114,6 +116,7 @@ public class ClientNetworking {
                 boolean broken = buf.readBoolean();
                 boolean hasHalf = buf.readBoolean();
                 boolean topHalf = hasHalf && buf.readBoolean();
+                boolean fractureLocked = buf.readBoolean();
                 float partAbs = buf.readFloat();
                 float partBoost = buf.readFloat();
                 client.execute(() -> {
@@ -125,6 +128,7 @@ public class ClientNetworking {
                     part.setHealth(health);
                     part.setBroken(broken);
                     part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                    part.setFractureLocked(fractureLocked);
                     body.clientSetAbsorptionBucket(idf, partAbs);
                     body.clientSetBoostBucket(idf, partBoost);
                 });
