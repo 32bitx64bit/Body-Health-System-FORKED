@@ -237,7 +237,9 @@ public abstract class Body {
         }
 
         // After damage is applied, evaluate bone break chance (except skull)
-        if (!part.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && !suppressBoneBreakEvaluation) {
+        if (!part.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)
+                && !suppressBoneBreakEvaluation
+                && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
             evaluateBoneBreak(part, previousHealth, amount);
         }
 
@@ -306,6 +308,7 @@ public abstract class Body {
     public void applyBrokenBonesEffects() {
         if (!(entity instanceof net.minecraft.entity.player.PlayerEntity player)) return;
         if (entity.getWorld().isClient) return; // server-side control
+        if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) return;
 
         // If no bones are broken, deactivate timers and clear bone-based negatives
         if (!anyBoneBroken()) {

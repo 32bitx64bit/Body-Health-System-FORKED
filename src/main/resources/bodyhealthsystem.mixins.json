@@ -19,7 +19,8 @@
     "OnDeathMixin",
     "ForcePoseMixin",
     "AnvilApplyGelMixin",
-    "DisableDefaultAnvilResultMixin"
+    "DisableDefaultAnvilResultMixin",
+    "SleepHealMixin"
   ],
   "client": [
     "InventoryScreenHudMixin",

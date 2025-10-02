@@ -145,8 +145,15 @@ public class PlayerTickMixin {
             return;
         }
 
-        // Replace damage-based effects with bone-based system
-        body.applyBrokenBonesEffects();
+        // Replace damage-based effects with bone-based system (if enabled)
+        if (Config.enableBoneSystem) {
+            body.applyBrokenBonesEffects();
+        } else {
+            // Ensure bone debuffs are cleared when disabled
+            player.removeStatusEffect(StatusEffects.SLOWNESS);
+            player.removeStatusEffect(StatusEffects.MINING_FATIGUE);
+            player.removeStatusEffect(StatusEffects.WEAKNESS);
+        }
 
         // Force crawling only if both legs AND both feet have broken bones
         boolean crawlingRequired = false;
@@ -162,7 +169,7 @@ public class PlayerTickMixin {
             crawlingRequired = bothLegsBroken && bothFeetBroken;
         }
 
-        if (crawlingRequired) {
+        if (Config.enableBoneSystem && crawlingRequired) {
             if (!player.getWorld().isClient) {
                 if (!player.isTouchingWater() && (player.getPose() != EntityPose.SWIMMING || !player.isSwimming())) {
                     player.setSwimming(true);

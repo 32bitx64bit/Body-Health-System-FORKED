@@ -85,6 +85,12 @@
   "bodyhealthsystem.midnightconfig.comment_vanilla": "Vanilla Behaviour",
   "bodyhealthsystem.midnightconfig.forceDisableVanillaRegen": "Force disable vanilla natural regeneration",
 
+  "bodyhealthsystem.midnightconfig.sleepHealPercent": "Sleep heal percent (of total body health)",
+  "bodyhealthsystem.midnightconfig.BoneHealChance": "Sleep bone heal base chance",
+  "bodyhealthsystem.midnightconfig.BoneHealDailyIncrease": "Sleep bone heal daily increase",
+  "bodyhealthsystem.midnightconfig.enableBoneSystem": "Enable Bone System",
+  "bodyhealthsystem.midnightconfig.showInventoryBodyHud": "Show body HUD in inventory",
+
   "button.bodyhealthsystem.give_up": "Give Up",
   "screen.bodyhealthsystem.downed_title": "You Are Downed",
   "screen.bodyhealthsystem.downed_message": "You are incapacitated. Wait for revival or give up.",

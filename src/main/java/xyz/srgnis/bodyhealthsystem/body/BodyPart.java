@@ -15,6 +15,8 @@ public abstract class BodyPart {
     private boolean broken = false;
     // For arms: whether the broken overlay should be on the top half (true) or bottom half (false)
     private Boolean brokenTopHalf = null;
+    // Sleep healing: accumulated bonus chance to heal this bone on wake-up
+    private float sleepHealBonus = 0.0f;
 
     protected float criticalThreshold;
     private LivingEntity entity;
@@ -122,6 +124,7 @@ public abstract class BodyPart {
         new_nbt.putFloat("health", health);
         new_nbt.putBoolean("broken", broken);
         if (brokenTopHalf != null) new_nbt.putBoolean("brokenTopHalf", brokenTopHalf);
+        if (sleepHealBonus > 0.0f) new_nbt.putFloat("sleepHealBonus", sleepHealBonus);
         nbt.put(identifier.toString(), new_nbt);
     }
 
@@ -136,6 +139,11 @@ public abstract class BodyPart {
             brokenTopHalf = nbt.getBoolean("brokenTopHalf");
         } else {
             brokenTopHalf = null;
+        }
+        if (nbt.contains("sleepHealBonus")) {
+            sleepHealBonus = nbt.getFloat("sleepHealBonus");
+        } else {
+            sleepHealBonus = 0.0f;
         }
     }
 
@@ -160,6 +168,10 @@ public abstract class BodyPart {
 
     public void setBroken(boolean broken) {
         this.broken = broken;
+        if (!broken) {
+            // Reset accumulated sleep bonus when healed
+            this.sleepHealBonus = 0.0f;
+        }
     }
 
     public Boolean getBrokenTopHalf() {
@@ -168,5 +180,13 @@ public abstract class BodyPart {
 
     public void setBrokenTopHalf(Boolean brokenTopHalf) {
         this.brokenTopHalf = brokenTopHalf;
+    }
+
+    public float getSleepHealBonus() {
+        return sleepHealBonus;
+    }
+
+    public void setSleepHealBonus(float bonus) {
+        this.sleepHealBonus = Math.max(0.0f, Math.min(1.0f, bonus));
     }
 }

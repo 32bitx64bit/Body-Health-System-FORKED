@@ -47,6 +47,18 @@ public class Config extends MidnightConfig {
     @Comment(centered = true) public static Comment comment_vanilla;
     @Entry public static boolean forceDisableVanillaRegen = true;
 
+    @Comment(centered = true) public static Comment comment_sleep;
+    // Heal this fraction of total body health on successful sleep (morning)
+    @Entry public static float sleepHealPercent = 0.35f;
+    // Base chance to heal each broken bone when waking up
+    @Entry public static float sleepBoneHealBaseChance = 0.30f;
+    // Additional chance added to each still-broken bone after each sleep
+    @Entry public static float sleepBoneHealDailyIncrease = 0.05f;
+
+    @Comment(centered = true) public static Comment comment_bones;
+    // Master toggle for the bone system (breaks, crawling, penalties, sleep-bone healing)
+    @Entry public static boolean enableBoneSystem = true;
+
     @Comment(centered = true) public static Comment comment_HUDConfig;
     @Entry public static HudPosition hudPosition = HudPosition.TOP_LEFT;
     @Entry public static int hudXOffset = 0;
