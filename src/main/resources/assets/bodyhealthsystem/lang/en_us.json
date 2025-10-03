@@ -126,5 +126,8 @@
 
   "block.bodyhealthsystem.space_heater": "Space Heater",
   "screen.bodyhealthsystem.heater.mode_heater": "Power: Stable",
-  "screen.bodyhealthsystem.heater.mode_regulate": "Power: Variable"
+  "screen.bodyhealthsystem.heater.mode_regulate": "Power: Variable",
+
+  "item.bodyhealthsystem.tourniquet": "Tourniquet",
+  "item.bodyhealthsystem.stitches": "Stitches"
 }
