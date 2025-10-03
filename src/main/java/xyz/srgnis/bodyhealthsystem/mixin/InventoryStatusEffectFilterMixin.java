@@ -35,6 +35,7 @@ public abstract class InventoryStatusEffectFilterMixin {
         boolean cold = player.getStatusEffect(ModStatusEffects.HYPO_MILD) != null
                 || player.getStatusEffect(ModStatusEffects.HYPO_MOD) != null
                 || player.getStatusEffect(ModStatusEffects.HYPO_SERV) != null;
+        boolean brokenBone = player.getStatusEffect(ModStatusEffects.BROKEN_BONE) != null;
 
         // Build a stable, consistently sorted list to prevent rapid position switching
         List<StatusEffectInstance> list = new ArrayList<>(original);
@@ -45,11 +46,21 @@ public abstract class InventoryStatusEffectFilterMixin {
                 })
                 .thenComparing((StatusEffectInstance e) -> -e.getAmplifier()));
 
-        if (!(heat || cold)) {
+        if (!(heat || cold || brokenBone)) {
             // Respect shouldShowIcon even when not filtering
             List<StatusEffectInstance> visible = new ArrayList<>(list.size());
             for (StatusEffectInstance inst : list) {
-                if (inst != null && inst.shouldShowIcon()) visible.add(inst);
+                if (inst == null) continue;
+                if (!inst.shouldShowIcon()) continue;
+                // Always include our condition icons
+                StatusEffect type = inst.getEffectType();
+                if (type == ModStatusEffects.HYPO_MILD || type == ModStatusEffects.HYPO_MOD || type == ModStatusEffects.HYPO_SERV
+                        || type == ModStatusEffects.HEAT_STROKE_INIT || type == ModStatusEffects.HEAT_STROKE_MOD || type == ModStatusEffects.HEAT_STROKE_SERV
+                        || type == ModStatusEffects.BROKEN_BONE) {
+                    visible.add(inst);
+                    continue;
+                }
+                visible.add(inst);
             }
             return visible;
         }
@@ -59,6 +70,14 @@ public abstract class InventoryStatusEffectFilterMixin {
             if (inst == null) continue;
             if (!inst.shouldShowIcon()) continue;
             StatusEffect type = inst.getEffectType();
+            // Never hide our custom condition icons
+            if (type == ModStatusEffects.HYPO_MILD || type == ModStatusEffects.HYPO_MOD || type == ModStatusEffects.HYPO_SERV
+                    || type == ModStatusEffects.HEAT_STROKE_INIT || type == ModStatusEffects.HEAT_STROKE_MOD || type == ModStatusEffects.HEAT_STROKE_SERV
+                    || type == ModStatusEffects.BROKEN_BONE) {
+                filtered.add(inst);
+                continue;
+            }
+            // Hide vanilla negatives when any of our condition icons are present (heat/cold/broken bone)
             if (type == StatusEffects.SLOWNESS || type == StatusEffects.WEAKNESS || type == StatusEffects.MINING_FATIGUE) {
                 continue;
             }

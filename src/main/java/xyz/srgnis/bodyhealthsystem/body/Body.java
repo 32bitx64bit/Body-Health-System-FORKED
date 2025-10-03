@@ -312,8 +312,25 @@ public abstract class Body {
         if (entity.getWorld().isClient) return; // server-side control
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) return;
 
-        // If no bones are broken, deactivate timers and clear bone-based negatives
-        if (!anyBoneBroken()) {
+        // Determine impairment: either bone broken OR limb destroyed (HP <= 0) counts as impaired
+        int impairedArms = 0;
+        int impairedLegsFeet = 0;
+        for (BodyPart p : getParts()) {
+            var id = p.getIdentifier();
+            if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
+            boolean impaired = p.isBroken() || p.getHealth() <= 0.0f;
+            if (!impaired) continue;
+            if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM)
+                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM)) impairedArms++;
+            if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG)
+                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG)
+                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT)
+                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT)) impairedLegsFeet++;
+        }
+        boolean anyImpaired = (impairedArms + impairedLegsFeet) > 0;
+
+        // If neither bones are broken nor any limb destroyed, deactivate timers and clear negatives
+        if (!anyBoneBroken() && !anyImpaired) {
             bonePenaltyActive = false;
             boneGraceTicksRemaining = 0;
             bonePenaltyTickCounter = 0;
@@ -377,15 +394,26 @@ public abstract class Body {
             player.removeStatusEffect(ModStatusEffects.BROKEN_BONE);
         }
 
+        // Apply vanilla debuffs based on impairment (broken or destroyed)
+        // Arms impaired -> Weakness; Legs/Feet impaired -> Slowness; Any impaired -> Mining Fatigue
+        int weakAmp = impairedArms >= 2 ? 1 : (impairedArms >= 1 ? 0 : -1);
+        int slowAmp = impairedLegsFeet >= 2 ? 1 : (impairedLegsFeet >= 1 ? 0 : -1);
+        int fatigueAmp = (impairedArms + impairedLegsFeet) >= 2 ? 0 : (impairedArms + impairedLegsFeet) >= 4 ? 1 : ((impairedArms + impairedLegsFeet) >= 1 ? 0 : -1);
+        // Clamp and apply
+        if (slowAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, slowAmp, false, false, true));
+        else player.removeStatusEffect(StatusEffects.SLOWNESS);
+        if (weakAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, weakAmp, false, false, true));
+        else player.removeStatusEffect(StatusEffects.WEAKNESS);
+        if (fatigueAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, fatigueAmp, false, false, true));
+        else player.removeStatusEffect(StatusEffects.MINING_FATIGUE);
+
         // Retain BLEEDING_EFFECT for future use; do not manage/display it here anymore
 
-        // Periodic health penalty once grace elapsed
-        // Keeping structure for future re-use if needed.
+        // Periodic health penalty once grace elapsed (no-op for now)
         if (bonePenaltyActive) {
             bonePenaltyTickCounter++;
             if (bonePenaltyTickCounter >= 200) {
                 bonePenaltyTickCounter = 0;
-                // no periodic damage here anymore
             }
         }
     }
@@ -426,20 +454,31 @@ public abstract class Body {
             amount -= apply;
         }
         if (amount <= 0.0f) return;
-        // Choose spillover target: random non-head with health > 0; else head; else do nothing
-        java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
+        // Choose spillover target: prefer non-head, non-torso limbs; only include torso if no other limbs available; head only as last resort
+        java.util.List<BodyPart> limbCandidates = new java.util.ArrayList<>();
+        java.util.List<BodyPart> torsoCandidate = new java.util.ArrayList<>();
         BodyPart head = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+        BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
         for (BodyPart p : getParts()) {
             if (p == target) continue;
             if (p.getHealth() <= 0.0f) continue;
-            if (head != null && p.getIdentifier().equals(head.getIdentifier())) continue;
-            candidates.add(p);
+            var id = p.getIdentifier();
+            if (head != null && id.equals(head.getIdentifier())) continue;
+            if (torso != null && id.equals(torso.getIdentifier())) {
+                torsoCandidate.add(p);
+            } else {
+                limbCandidates.add(p);
+            }
         }
-        if (candidates.isEmpty() && head != null && head.getHealth() > 0.0f) {
-            candidates.add(head);
+        BodyPart spill = null;
+        if (!limbCandidates.isEmpty()) {
+            spill = limbCandidates.get(entity.getRandom().nextInt(limbCandidates.size()));
+        } else if (!torsoCandidate.isEmpty()) {
+            spill = torsoCandidate.get(0);
+        } else if (head != null && head.getHealth() > 0.0f) {
+            spill = head;
         }
-        if (candidates.isEmpty()) return;
-        BodyPart spill = candidates.get(entity.getRandom().nextInt(candidates.size()));
+        if (spill == null) return;
         applyBleedingDamageTo(player, spill, amount);
     }
 
