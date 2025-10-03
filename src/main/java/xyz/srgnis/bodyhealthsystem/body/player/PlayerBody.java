@@ -64,13 +64,18 @@ public class PlayerBody extends Body {
             BodyPart part = selectPartFromNormalized(norm);
             if (part != null) {
                 applyDamageLocal(amount, source, part);
+                applyWoundChances(part, true);
             } else {
-                applyDamageLocalRandom(amount, source);
+                BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
+                applyDamageLocal(amount, source, p);
+                applyWoundChances(p, true);
             }
             // Clear after consumption to avoid stale data
             ProjectileHitTracker.clear((PlayerEntity) entity);
         } else {
-            applyDamageLocalRandom(amount, source);
+            BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
+            applyDamageLocal(amount, source, p);
+            applyWoundChances(p, false);
         }
 
     }
@@ -189,6 +194,29 @@ public class PlayerBody extends Body {
             }
         }
         return amount;
+    }
+
+    // --- Wounds ---
+    private void applyWoundChances(BodyPart part, boolean projectile) {
+        if (suppressWoundEvaluation || part == null) return;
+        double multiplier = 1.0;
+        var id = part.getIdentifier();
+        if (id.equals(LEFT_FOOT) || id.equals(RIGHT_FOOT)) multiplier = 0.75;
+        float hp = Math.max(0.0f, part.getHealth());
+        float nearDeadHP = 1.0f;
+        float max = Math.max(nearDeadHP, part.getMaxHealth());
+        float t = 1.0f - Math.min(1.0f, (hp - nearDeadHP) / Math.max(0.0001f, (max - nearDeadHP)));
+        double smallBase = 0.35 + (0.80 - 0.35) * t;
+        double largeBase = 0.15 + (0.65 - 0.15) * t;
+        smallBase *= multiplier;
+        largeBase *= multiplier;
+        var rnd = entity.getRandom();
+        if (part.hasWoundCapacity() && rnd.nextDouble() < largeBase) {
+            part.addLargeWound();
+        }
+        if (part.hasWoundCapacity() && rnd.nextDouble() < smallBase) {
+            part.addSmallWound();
+        }
     }
 
     private BodyPart selectPartFromNormalized(Vec3d norm) {

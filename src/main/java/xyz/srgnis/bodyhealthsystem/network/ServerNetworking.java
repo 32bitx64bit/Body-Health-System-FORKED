@@ -100,6 +100,43 @@ public class ServerNetworking {
             });
         });
 
+        // Remove tourniquet request (UI-triggered without holding the item)
+        ServerPlayNetworking.registerGlobalReceiver(id("remove_tourniquet"), (server, player, handler, buf, responseSender) -> {
+            int entityId = buf.readInt();
+            Identifier partId = buf.readIdentifier();
+            server.execute(() -> {
+                Entity e = player.getWorld().getEntityById(entityId);
+                if (!(e instanceof BodyProvider)) return;
+                var body = ((BodyProvider) e).getBody();
+                BodyPart part = body.getPart(partId);
+                if (part == null) return;
+                try {
+                    boolean has = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
+                    if (!has) return;
+                    // Toggle off this part
+                    part.getClass().getMethod("setTourniquet", boolean.class).invoke(part, false);
+                    // Mirror if leg/foot
+                    var pid = part.getIdentifier();
+                    if (pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG) || pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT)){
+                        BodyPart leg = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG);
+                        BodyPart foot = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT);
+                        if (leg != null) leg.getClass().getMethod("setTourniquet", boolean.class).invoke(leg, false);
+                        if (foot != null) foot.getClass().getMethod("setTourniquet", boolean.class).invoke(foot, false);
+                    }
+                    if (pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG) || pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT)){
+                        BodyPart leg = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG);
+                        BodyPart foot = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
+                        if (leg != null) leg.getClass().getMethod("setTourniquet", boolean.class).invoke(leg, false);
+                        if (foot != null) foot.getClass().getMethod("setTourniquet", boolean.class).invoke(foot, false);
+                    }
+                } catch (Throwable ignored) {}
+                // Refund one Tourniquet item
+                player.giveItemStack(new net.minecraft.item.ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
+                // Sync
+                if (e instanceof PlayerEntity pe) syncBody(pe);
+            });
+        });
+
         // Space Heater mode toggle
         ServerPlayNetworking.registerGlobalReceiver(id("heater_mode"), (server, player, handler, buf, responseSender) -> {
             BlockPos pos = buf.readBlockPos();
@@ -147,6 +184,22 @@ public class ServerNetworking {
             // per-part buckets
             buf.writeFloat(body.getAbsorptionForPart(idf));
             buf.writeFloat(body.getBoostForPart(idf));
+            // wounds/tourniquet/necrosis extra payload
+            int s = 0, l = 0, necState = 0, tqTicks = 0; boolean tq = false; float necScale = 1.0f;
+            try {
+                s = (int) part.getClass().getMethod("getSmallWounds").invoke(part);
+                l = (int) part.getClass().getMethod("getLargeWounds").invoke(part);
+                tq = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
+                tqTicks = (int) part.getClass().getMethod("getTourniquetTicks").invoke(part);
+                necState = (int) part.getClass().getMethod("getNecrosisState").invoke(part);
+                necScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
+            } catch (Throwable ignored) {}
+            buf.writeInt(s);
+            buf.writeInt(l);
+            buf.writeBoolean(tq);
+            buf.writeInt(tqTicks);
+            buf.writeInt(necState);
+            buf.writeFloat(necScale);
         }
         // Downed sync (server authoritative)
         buf.writeBoolean(body.isDowned());
@@ -184,6 +237,21 @@ public class ServerNetworking {
             buf.writeBoolean(part.isFractureLocked());
             buf.writeFloat(body.getAbsorptionForPart(idf));
             buf.writeFloat(body.getBoostForPart(idf));
+            int s = 0, l = 0, necState = 0, tqTicks = 0; boolean tq = false; float necScale = 1.0f;
+            try {
+                s = (int) part.getClass().getMethod("getSmallWounds").invoke(part);
+                l = (int) part.getClass().getMethod("getLargeWounds").invoke(part);
+                tq = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
+                tqTicks = (int) part.getClass().getMethod("getTourniquetTicks").invoke(part);
+                necState = (int) part.getClass().getMethod("getNecrosisState").invoke(part);
+                necScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
+            } catch (Throwable ignored) {}
+            buf.writeInt(s);
+            buf.writeInt(l);
+            buf.writeBoolean(tq);
+            buf.writeInt(tqTicks);
+            buf.writeInt(necState);
+            buf.writeFloat(necScale);
         }
         buf.writeBoolean(body.isDowned());
         buf.writeInt(body.getBleedOutTicksRemaining());
@@ -203,6 +271,119 @@ public class ServerNetworking {
         if (part == null) return;
 
         boolean isUpgraded = itemStack.getItem() == ModItems.UPGRADED_MEDKIT_ITEM;
+        boolean isPlaster = itemStack.getItem() == ModItems.PLASTER_ITEM;
+        boolean isStitches = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES;
+        boolean isTourniquet = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET;
+
+        if (isPlaster) {
+            // Remove exactly 1 small wound on targeted limb; if no damaged parts remain, remove from random limb if any small wounds exist
+            boolean removed = false;
+            try {
+                removed = (boolean) part.getClass().getMethod("removeSmallWound").invoke(part);
+            } catch (Throwable ignored) {}
+            if (!removed) {
+                // If all limbs at max health, remove from a random limb that has a small wound
+                boolean allMax = true;
+                for (BodyPart p : body.getParts()) {
+                    if (p.getHealth() < p.getMaxHealth()) { allMax = false; break; }
+                }
+                if (allMax) {
+                    java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
+                    for (BodyPart p : body.getParts()) {
+                        try { if ((int) p.getClass().getMethod("getSmallWounds").invoke(p) > 0) candidates.add(p); } catch (Throwable ignored) {}
+                    }
+                    if (!candidates.isEmpty()) {
+                        BodyPart pick = candidates.get(serverPlayerEntity.getRandom().nextInt(candidates.size()));
+                        try { removed = (boolean) pick.getClass().getMethod("removeSmallWound").invoke(pick); } catch (Throwable ignored) {}
+                    }
+                }
+            }
+            if (removed) {
+                // decrement
+                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
+                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
+                }else{
+                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
+                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+                }
+                syncBody((PlayerEntity) entity);
+            }
+            return;
+        }
+
+        if (isStitches) {
+            boolean did = false;
+            try {
+                int lw = (int) part.getClass().getMethod("getLargeWounds").invoke(part);
+                if (lw > 0) {
+                    part.getClass().getMethod("removeLargeWound").invoke(part);
+                    did = true;
+                } else {
+                    int sw = (int) part.getClass().getMethod("getSmallWounds").invoke(part);
+                    if (sw > 0) {
+                        part.getClass().getMethod("removeSmallWound").invoke(part);
+                        did = true;
+                    }
+                }
+            } catch (Throwable ignored) {}
+            if (did) {
+                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
+                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
+                }else{
+                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
+                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+                }
+                syncBody((PlayerEntity) entity);
+            }
+            return;
+        }
+
+        if (isTourniquet) {
+            // Toggle tourniquet on allowed parts; leg <-> foot mirrored both ways
+            var pid = part.getIdentifier();
+            boolean isLeftArm = pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM);
+            boolean isRightArm = pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM);
+            boolean isLeftLeg = pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG);
+            boolean isRightLeg = pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG);
+            boolean isLeftFoot = pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT);
+            boolean isRightFoot = pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
+            boolean isHead = pid.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+            boolean allowed = isLeftArm || isRightArm || isLeftLeg || isRightLeg || isLeftFoot || isRightFoot || isHead;
+            if (!allowed) return;
+            boolean newState = false;
+            try {
+                boolean has = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
+                newState = !has; // apply when no tourniquet, remove when present
+                part.getClass().getMethod("setTourniquet", boolean.class).invoke(part, newState);
+                // Mirror leg<->foot on same side
+                if (isLeftLeg || isLeftFoot) {
+                    BodyPart leg = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG);
+                    BodyPart foot = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT);
+                    if (leg != null && leg != part) leg.getClass().getMethod("setTourniquet", boolean.class).invoke(leg, newState);
+                    if (foot != null && foot != part) foot.getClass().getMethod("setTourniquet", boolean.class).invoke(foot, newState);
+                }
+                if (isRightLeg || isRightFoot) {
+                    BodyPart leg = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG);
+                    BodyPart foot = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
+                    if (leg != null && leg != part) leg.getClass().getMethod("setTourniquet", boolean.class).invoke(leg, newState);
+                    if (foot != null && foot != part) foot.getClass().getMethod("setTourniquet", boolean.class).invoke(foot, newState);
+                }
+            } catch (Throwable ignored) {}
+            if (newState) {
+                // Applying tourniquet consumes one
+                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
+                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
+                }else{
+                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
+                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+                }
+            } else {
+                // Removing tourniquet returns the item
+                serverPlayerEntity.giveItemStack(new ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
+            }
+            syncBody((PlayerEntity) entity);
+            return;
+        }
 
         if (isUpgraded) {
             boolean didSomething = false;
@@ -240,6 +421,7 @@ public class ServerNetworking {
                 return;
             }
             body.healPart(4, partID);
+            // decrement from inventory (inline to avoid missing method)
             if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
                 serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
             }else{

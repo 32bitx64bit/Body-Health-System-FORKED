@@ -33,6 +33,8 @@ public abstract class Body {
 
     // When true, skip bone-break evaluation for the current damage application
     protected boolean suppressBoneBreakEvaluation = false;
+    // When true, skip wound evaluation (used for bleed/necrosis damage applications)
+    protected boolean suppressWoundEvaluation = false;
     // Track last known vanilla max health to detect Health Boost/attribute changes
     protected float lastKnownMaxHealth = -1.0f;
 
@@ -391,10 +393,12 @@ public abstract class Body {
     private void applyBleedingDamageTo(net.minecraft.entity.player.PlayerEntity player, BodyPart target, float amount) {
         if (target == null || amount <= 0.0f) return;
         suppressBoneBreakEvaluation = true;
+        suppressWoundEvaluation = true;
         try {
             takeDamage(amount, player.getDamageSources().generic(), target);
         } finally {
             suppressBoneBreakEvaluation = false;
+            suppressWoundEvaluation = false;
         }
     }
 
@@ -402,11 +406,41 @@ public abstract class Body {
     public void applyNonBreakingDamage(float amount, net.minecraft.entity.damage.DamageSource source, BodyPart target) {
         if (target == null || amount <= 0.0f) return;
         suppressBoneBreakEvaluation = true;
+        suppressWoundEvaluation = true;
         try {
             takeDamage(amount, source, target);
         } finally {
             suppressBoneBreakEvaluation = false;
+            suppressWoundEvaluation = false;
         }
+    }
+
+    // Apply bleeding damage with spillover rules (avoid head unless last remaining)
+    public void applyBleedingWithSpill(float amount, BodyPart target) {
+        if (!(entity instanceof net.minecraft.entity.player.PlayerEntity player)) return;
+        if (amount <= 0.0f || target == null) return;
+        float hp = target.getHealth();
+        if (hp > 0.0f) {
+            float apply = Math.min(amount, hp);
+            applyBleedingDamageTo(player, target, apply);
+            amount -= apply;
+        }
+        if (amount <= 0.0f) return;
+        // Choose spillover target: random non-head with health > 0; else head; else do nothing
+        java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
+        BodyPart head = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+        for (BodyPart p : getParts()) {
+            if (p == target) continue;
+            if (p.getHealth() <= 0.0f) continue;
+            if (head != null && p.getIdentifier().equals(head.getIdentifier())) continue;
+            candidates.add(p);
+        }
+        if (candidates.isEmpty() && head != null && head.getHealth() > 0.0f) {
+            candidates.add(head);
+        }
+        if (candidates.isEmpty()) return;
+        BodyPart spill = candidates.get(entity.getRandom().nextInt(candidates.size()));
+        applyBleedingDamageTo(player, spill, amount);
     }
 
     public void applyStatusEffectWithAmplifier(StatusEffect effect, int amplifier){

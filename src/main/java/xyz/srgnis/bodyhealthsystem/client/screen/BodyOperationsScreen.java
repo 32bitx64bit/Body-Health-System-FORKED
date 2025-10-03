@@ -36,6 +36,9 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     private static final Identifier TEX_RIBCAGE = new Identifier(BHSMain.MOD_ID, "textures/gui/ribcage.png");
     private static final Identifier TEX_SKULL = new Identifier(BHSMain.MOD_ID, "textures/gui/skull.png");
     private static final Identifier TEX_FOOT = new Identifier(BHSMain.MOD_ID, "textures/gui/foot.png");
+    // Wound overlays
+    private static final Identifier TEX_WOUND_SMALL = new Identifier(BHSMain.MOD_ID, "textures/gui/wound_small.png");
+    private static final Identifier TEX_WOUND_LARGE = new Identifier(BHSMain.MOD_ID, "textures/gui/wound_large.png");
 
     private static final Identifier TEX_BONEMAIN_BROKEN = new Identifier(BHSMain.MOD_ID, "textures/gui/bonemainbroken.png");
     private static final Identifier TEX_RIBCAGE_BROKEN = new Identifier(BHSMain.MOD_ID, "textures/gui/ribcagebroken.png");
@@ -122,7 +125,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         this.clearChildren();
         LivingEntity target = this.handler.getEntity();
         if (target == null) return;
-        boolean allowClick = !this.handler.getItemStack().isEmpty();
+        boolean allowClick = true; // Always allow clicking parts; server-side will validate item use vs. bare removal
 
         int startX = (this.width - this.backgroundWidth) / 2;
         int startY = (this.height - this.backgroundHeight) / 2;
@@ -297,6 +300,34 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                         float hbAlloc = handler.getBody().getBoostForPart(part.getIdentifier());
                         if (hbAlloc > 0.0f) list.add(Text.literal("Health Boost: " + Math.round(hbAlloc)));
                         if (part.isBroken()) list.add(Text.literal("Broken"));
+                        // Wound/tourniquet info
+                        try {
+                            int s = (int) part.getClass().getMethod("getSmallWounds").invoke(part);
+                            int l = (int) part.getClass().getMethod("getLargeWounds").invoke(part);
+                            boolean tq = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
+                            int tqTicks = (int) part.getClass().getMethod("getTourniquetTicks").invoke(part);
+                            int necState = (int) part.getClass().getMethod("getNecrosisState").invoke(part);
+                            float nScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
+                            if (s > 0 || l > 0) list.add(Text.literal("Wounds: S"+s+"/L"+l));
+                            if (tq) {
+                                // Show countdowns: 7min safe, then 4min necrosis
+                                int total = tqTicks / 20;
+                                if (necState == 0) {
+                                    int remaining = Math.max(0, 7*60 - total);
+                                    list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (safe)"));
+                                } else if (necState == 1) {
+                                    // necrosis active; show remaining of 4 minutes
+                                    // We don't have direct necrosisTicks on client; derive from scale if needed. For simplicity, show time since start instead of exact remaining when scale not available.
+                                    int necRemaining = Math.max(0, 4*60 - Math.max(0, total - 7*60));
+                                    list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (necrosis)"));
+                                } else {
+                                    list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
+                                }
+                            }
+                            if (necState == 1) list.add(Text.literal("Necrosis: active"));
+                            if (necState == 2) list.add(Text.literal("Necrosis: permanent"));
+                            if (nScale < 1.0f) list.add(Text.literal("MaxHP: "+Math.round(nScale*100)+"%"));
+                        } catch (Throwable ignored) {}
                         drawContext.drawTooltip(this.textRenderer, list, mouseX, mouseY);
                     }
                 }
@@ -405,6 +436,11 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int color = showTemperature ? selectTemperatureColor(bodyTempC) : selectHealthColor(p);
         drawHealthRectangle(ctx, x, y, w, h, color);
 
+        // Draw wounds overlay before bones if showing health
+        if (!showTemperature) {
+            drawWounds(ctx, partId, p, x, y, w, h);
+        }
+
         if (showTemperature) return; // no bone overlay in temperature mode
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) return;
         if (!BONE_LAYER_ENABLED) return;
@@ -434,6 +470,42 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             } else {
                 ctx.drawTexture(tex, x, y, w, h, 0.0F, 0.0F, 16, 16, 16, 16);
             }
+        }
+    }
+
+    private void drawWounds(DrawContext ctx, Identifier partId, BodyPart p, int x, int y, int w, int h) {
+        // query counts via reflection (keeps client independent)
+        int s = 0, l = 0;
+        try {
+            s = (int) p.getClass().getMethod("getSmallWounds").invoke(p);
+            l = (int) p.getClass().getMethod("getLargeWounds").invoke(p);
+        } catch (Throwable ignored) {}
+        if (s <= 0 && l <= 0) return;
+        // Scale texture rects to the target rect
+        // Small wound source rect: (6,6)-(9,11) on 16x16
+        // Large wound source rect: (5,3)-(11,12)
+        // We’ll draw at logical center of the part rect, repeated per wound count with slight offsets
+        int cx = x + w / 2;
+        int cy = y + h / 2;
+        int offset = Math.max(2, Math.round(2 * DRAW_SCALE));
+        int drawCount = Math.min(2, s); // cap visual draws to 2 for small
+        for (int i = 0; i < drawCount; i++) {
+            int dx = cx - w / 8 + (i * offset);
+            int dy = cy - h / 8 + (i * offset);
+            // dest size proportional: roughly 1/4 of part rect each axis (clamped)
+            int dw = Math.max(6, Math.min(w, Math.round(Math.max(6, w * 0.35f))));
+            int dh = Math.max(6, Math.min(h, Math.round(Math.max(6, h * 0.35f))));
+            // source: 4x6 region (x:6..9, y:6..11) inclusive => width=4, height=6
+            ctx.drawTexture(TEX_WOUND_SMALL, dx, dy, dw, dh, 6.0F, 6.0F, 4, 6, 16, 16);
+        }
+        drawCount = Math.min(2, l);
+        for (int i = 0; i < drawCount; i++) {
+            int dx = cx - w / 6 - (i * offset);
+            int dy = cy - h / 6 - (i * offset);
+            int dw = Math.max(8, Math.min(w, Math.round(Math.max(8, w * 0.5f))));
+            int dh = Math.max(8, Math.min(h, Math.round(Math.max(8, h * 0.5f))));
+            // source: 7x10 region (x:5..11, y:3..12) inclusive => width=7, height=10
+            ctx.drawTexture(TEX_WOUND_LARGE, dx, dy, dw, dh, 5.0F, 3.0F, 7, 10, 16, 16);
         }
     }
 
@@ -474,6 +546,12 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
+    private static String formatMMSS(int seconds) {
+        int mm = seconds / 60;
+        int ss = seconds % 60;
+        return String.format("%d:%02d", mm, ss);
+    }
+
     private class PartButton extends ButtonWidget {
         private final Identifier partId;
         private final boolean allowClick;
@@ -488,8 +566,17 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         public void onPress() {
             if (!allowClick) return;
             BodyPart part = BodyOperationsScreen.this.handler.getBody().getPart(partId);
-            if (part == null || !part.isDamaged()) return;
-            ClientNetworking.useHealingItem(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier(), BodyOperationsScreen.this.handler.getItemStack());
+            if (part == null) return;
+            // If not using the Tourniquet item and a tourniquet is present, allow removal
+            var item = BodyOperationsScreen.this.handler.getItemStack();
+            boolean usingTourniquetItem = !item.isEmpty() && item.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET;
+            if (!usingTourniquetItem && part.hasTourniquet()) {
+                ClientNetworking.removeTourniquet(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier());
+                BodyOperationsScreen.this.close();
+                return;
+            }
+            // Otherwise, route to generic item use (Tourniquet item toggles apply/remove; other items heal, etc.)
+            ClientNetworking.useHealingItem(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier(), item);
             usedMedkit = true;
             // Restore bone layer if we auto-disabled it when opening for medkit
             if (disabledByMedkit && boneLayerWasEnabledOnOpen && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {

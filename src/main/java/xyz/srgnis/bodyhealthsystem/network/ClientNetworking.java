@@ -71,6 +71,13 @@ public class ClientNetworking {
                 boolean fractureLocked = buf.readBoolean();
                 float partAbs = buf.readFloat();
                 float partBoost = buf.readFloat();
+                // Optional wounds/tourniquet/necrosis payload
+                int sWounds = buf.readInt();
+                int lWounds = buf.readInt();
+                boolean tq = buf.readBoolean();
+                int tqTicks = buf.readInt();
+                int necState = buf.readInt();
+                float necScale = buf.readFloat();
                 client.execute(() -> {
                     if (!(entity instanceof BodyProvider bp)) return;
                     var body = bp.getBody();
@@ -83,6 +90,9 @@ public class ClientNetworking {
                     part.setFractureLocked(fractureLocked);
                     body.clientSetAbsorptionBucket(idf, partAbs);
                     body.clientSetBoostBucket(idf, partBoost);
+                    part.clientSetWounds(sWounds, lWounds);
+                    part.clientSetTourniquet(tq, tqTicks);
+                    part.clientSetNecrosis(necState, necScale);
                 });
             } catch (Exception ex) {
                 buf.readerIndex(readerIndex);
@@ -119,6 +129,12 @@ public class ClientNetworking {
                 boolean fractureLocked = buf.readBoolean();
                 float partAbs = buf.readFloat();
                 float partBoost = buf.readFloat();
+                int sWounds = buf.readInt();
+                int lWounds = buf.readInt();
+                boolean tq = buf.readBoolean();
+                int tqTicks = buf.readInt();
+                int necState = buf.readInt();
+                float necScale = buf.readFloat();
                 client.execute(() -> {
                     if (!(client.player instanceof BodyProvider bp)) return;
                     var body = bp.getBody();
@@ -131,6 +147,9 @@ public class ClientNetworking {
                     part.setFractureLocked(fractureLocked);
                     body.clientSetAbsorptionBucket(idf, partAbs);
                     body.clientSetBoostBucket(idf, partBoost);
+                    part.clientSetWounds(sWounds, lWounds);
+                    part.clientSetTourniquet(tq, tqTicks);
+                    part.clientSetNecrosis(necState, necScale);
                 });
             } catch (Exception ex) {
                 buf.readerIndex(readerIndex);
@@ -161,6 +180,13 @@ public class ClientNetworking {
         buf.writeItemStack(itemStack);
 
         ClientPlayNetworking.send(BHSMain.MOD_IDENTIFIER, buf);
+    }
+
+    public static void removeTourniquet(LivingEntity entity, Identifier partId) {
+        PacketByteBuf buf = PacketByteBufs.create();
+        buf.writeInt(entity.getId());
+        buf.writeIdentifier(partId);
+        ClientPlayNetworking.send(BHSMain.id("remove_tourniquet"), buf);
     }
 
     public static void requestBodyData(LivingEntity entity){

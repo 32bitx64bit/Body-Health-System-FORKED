@@ -22,6 +22,8 @@ import xyz.srgnis.bodyhealthsystem.items.CoolingGelItem;
 import xyz.srgnis.bodyhealthsystem.items.HeatingGelItem;
 import xyz.srgnis.bodyhealthsystem.items.ThermometerItem;
 import xyz.srgnis.bodyhealthsystem.items.PortableFanItem;
+import xyz.srgnis.bodyhealthsystem.items.StitchesItem;
+import xyz.srgnis.bodyhealthsystem.items.TourniquetItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -39,6 +41,8 @@ public class ModItems {
     public static final Item WOOL_BOOTS = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.BOOTS, new FabricItemSettings());
 
     public static final Item STRAW_HAT = new StrawHatItem(new FabricItemSettings());
+    public static final Item STITCHES = new StitchesItem(new FabricItemSettings());
+    public static final Item TOURNIQUET = new TourniquetItem(new FabricItemSettings());
 
     public static final Item COOLING_GEL = new CoolingGelItem(new FabricItemSettings().maxCount(16));
     public static final Item HEATING_GEL = new HeatingGelItem(new FabricItemSettings().maxCount(16));
@@ -64,6 +68,10 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"heating_gel"), HEATING_GEL);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"thermometer"), THERMOMETER);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"portable_fan"), PORTABLE_FAN);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "stitches"), STITCHES);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "tourniquet"), TOURNIQUET);
+        ModItemsHolder.setStitches(STITCHES);
+        ModItemsHolder.setTourniquet(TOURNIQUET);
 
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(PLASTER_ITEM);
@@ -102,6 +110,8 @@ public class ModItems {
             content.add(HEATING_GEL);
             content.add(THERMOMETER);
             content.add(PORTABLE_FAN);
+            content.add(STITCHES);
+            content.add(TOURNIQUET);
         });
     }
 }
