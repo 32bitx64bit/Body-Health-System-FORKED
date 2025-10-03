@@ -270,10 +270,14 @@ public class ServerNetworking {
         BodyPart part = body.getPart(partID);
         if (part == null) return;
 
+        // Guard: ignore empty or unknown items to prevent unintended healing
+        if (itemStack.isEmpty()) return;
+
         boolean isUpgraded = itemStack.getItem() == ModItems.UPGRADED_MEDKIT_ITEM;
         boolean isPlaster = itemStack.getItem() == ModItems.PLASTER_ITEM;
         boolean isStitches = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES;
         boolean isTourniquet = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET;
+        boolean isMedkit = itemStack.getItem() == ModItems.MEDKIT_ITEM;
 
         if (isPlaster) {
             // Remove exactly 1 small wound on targeted limb; if no damaged parts remain, remove from random limb if any small wounds exist
@@ -419,7 +423,7 @@ public class ServerNetworking {
         }
 
         // Default medkit behaviour: heal only when damaged
-        if (part.isDamaged()) {
+        if (isMedkit && part.isDamaged()) {
             // Do not allow healing if fracture has locked (requires upgraded medkit)
             if (part.isFractureLocked()) {
                 return;

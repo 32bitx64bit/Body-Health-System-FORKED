@@ -324,7 +324,10 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                                     list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
                                 }
                             }
-                            if (necState == 1) list.add(Text.literal("Necrosis: active"));
+                            if (necState == 1) {
+                                String phase = tq ? "Active" : "Healing";
+                                list.add(Text.literal("Necrosis: "+phase));
+                            }
                             if (necState == 2) list.add(Text.literal("Necrosis: permanent"));
                             if (nScale < 1.0f) list.add(Text.literal("MaxHP: "+Math.round(nScale*100)+"%"));
                         } catch (Throwable ignored) {}
@@ -576,8 +579,10 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                 return;
             }
             // Otherwise, route to generic item use (Tourniquet item toggles apply/remove; other items heal, etc.)
-            ClientNetworking.useHealingItem(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier(), item);
-            usedMedkit = true;
+            if (!item.isEmpty()) {
+                ClientNetworking.useHealingItem(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier(), item);
+                usedMedkit = true;
+            }
             // Restore bone layer if we auto-disabled it when opening for medkit
             if (disabledByMedkit && boneLayerWasEnabledOnOpen && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
                 BONE_LAYER_ENABLED = true;

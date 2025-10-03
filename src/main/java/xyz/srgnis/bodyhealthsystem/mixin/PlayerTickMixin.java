@@ -152,6 +152,14 @@ public class PlayerTickMixin {
                                     return;
                                 }
                             }
+                        } else {
+                            // If tourniquet removed while necrosis active (healing), tick recovery via existing method
+                            p.getClass().getMethod("tickRecovery").invoke(p);
+                            // When fully healed, clear necrosis state for clean UI
+                            int ns = (int) p.getClass().getMethod("getNecrosisState").invoke(p);
+                            if (ns == 1 && p.getMaxHealth() >= p.getBaseMaxHealth()) {
+                                p.getClass().getMethod("clearNecrosis").invoke(p);
+                            }
                         }
                     } catch (Throwable ignored) {}
                 } else {
@@ -172,9 +180,15 @@ public class PlayerTickMixin {
                                 }
                             }
                         } else {
-                            // If necrosis active and removed, recovery handled by BodyPart.setTourniquet(false) -> recoveryTicks set
+                            // If necrosis active and removed, tick recovery and clear when fully healed
+                            if (state == 1) {
+                                p.getClass().getMethod("tickRecovery").invoke(p);
+                                if (p.getMaxHealth() >= p.getBaseMaxHealth()) {
+                                    p.getClass().getMethod("clearNecrosis").invoke(p);
+                                }
+                            }
                         }
-                        // Tick recovery
+                        // Always tick recovery for other sources
                         p.getClass().getMethod("tickRecovery").invoke(p);
                     } catch (Throwable ignored) {}
                 }
