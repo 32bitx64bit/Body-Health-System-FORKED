@@ -36,6 +36,10 @@ public abstract class BodyPart {
     private int recoveryTicks = 0; // counts down recovery to restore max
     private float necrosisScale = 1.0f; // scales base maxHealth (0..1)
 
+    // Procedure (stitches) temporary debuff: scales max health down (e.g., to 0.5) and recovers to 1.0 over time
+    private float procScale = 1.0f; // 0..1
+    private int procRecoveryTicks = 0; // counts down to 0 while recovering
+
     protected float criticalThreshold;
     private LivingEntity entity;
     private Identifier identifier;
@@ -117,7 +121,8 @@ public abstract class BodyPart {
 
     // Effective max (accounts for necrosis scale)
     public float getMaxHealth() {
-        return Math.max(0.0f, maxHealth * Math.max(0.0f, Math.min(1.0f, necrosisScale)));
+        float scale = Math.max(0.0f, Math.min(1.0f, necrosisScale)) * Math.max(0.0f, Math.min(1.0f, procScale));
+        return Math.max(0.0f, maxHealth * scale);
     }
 
     public float getBaseMaxHealth() { return maxHealth; }
@@ -162,6 +167,8 @@ public abstract class BodyPart {
         if (recoveryTicks > 0) new_nbt.putInt("recoveryTicks", recoveryTicks);
         if (necrosisScale != 1.0f) new_nbt.putFloat("necrosisScale", necrosisScale);
         if (woundBleedTicks > 0) new_nbt.putInt("woundBleedTicks", woundBleedTicks);
+        if (procScale != 1.0f) new_nbt.putFloat("procScale", procScale);
+        if (procRecoveryTicks > 0) new_nbt.putInt("procRecoveryTicks", procRecoveryTicks);
         nbt.put(identifier.toString(), new_nbt);
     }
 
@@ -210,6 +217,8 @@ public abstract class BodyPart {
             if (largeWounds > 0) smallWounds = 0; else largeWounds = 0;
         }
         necrosisScale = Math.max(0.0f, Math.min(1.0f, necrosisScale));
+        procScale = nbt.contains("procScale") ? Math.max(0.0f, Math.min(1.0f, nbt.getFloat("procScale"))) : 1.0f;
+        procRecoveryTicks = nbt.contains("procRecoveryTicks") ? Math.max(0, nbt.getInt("procRecoveryTicks")) : 0;
     }
 
     @Override
@@ -363,6 +372,24 @@ public abstract class BodyPart {
     public void forceStartRecovery() {
         recoveryTicks = 5 * 60 * 20;
     }
+
+    // Stitches debuff: drop to 50% and recover over 3 minutes
+    public void beginStitchDebuff() {
+        this.procScale = 0.5f;
+        this.procRecoveryTicks = 3 * 60 * 20;
+        if (health > getMaxHealth()) setHealth(getMaxHealth());
+    }
+
+    public void tickProcedureRecovery() {
+        if (procRecoveryTicks > 0) {
+            procRecoveryTicks--;
+            float step = 0.5f / (3.0f * 60.0f * 20.0f); // from 0.5 -> 1.0 over 3 minutes
+            procScale = Math.min(1.0f, procScale + step);
+        }
+    }
+
+    public boolean hasProcedureDebuff() { return procRecoveryTicks > 0 || procScale < 1.0f; }
+    public void clearProcedureDebuff() { procScale = 1.0f; procRecoveryTicks = 0; }
 
     // ---- Client sync setters ----
     public void clientSetWounds(int small, int large) {

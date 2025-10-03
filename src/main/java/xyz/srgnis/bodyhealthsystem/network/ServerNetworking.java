@@ -325,6 +325,10 @@ public class ServerNetworking {
                         did = true;
                     }
                 }
+                if (did) {
+                    // Apply 50% max health debuff for 3 minutes to the treated limb
+                    part.getClass().getMethod("beginStitchDebuff").invoke(part);
+                }
             } catch (Throwable ignored) {}
             if (did) {
                 if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){

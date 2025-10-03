@@ -72,6 +72,22 @@ public abstract class SleepHealMixin {
             }
         }
 
+        // Also clear any lingering procedure debuff and necrosis recovery on sleep
+        for (BodyPart p : body.getParts()) {
+            try {
+                // Clear stitches temporary debuff
+                p.getClass().getMethod("clearProcedureDebuff").invoke(p);
+                // If tourniquet necrosis is healing, complete instantly on sleep
+                int state = (int) p.getClass().getMethod("getNecrosisState").invoke(p);
+                if (state == 1) { // active
+                    p.getClass().getMethod("clearNecrosis").invoke(p);
+                    // ensure scale set to full
+                    p.getClass().getMethod("forceStartRecovery").invoke(p); // optional: if you prefer instant, set necrosisScale via a setter
+                    // But we actually want instant: set recovery to 0 and necrosisScale to 1
+                    p.getClass().getMethod("clientSetNecrosis", int.class, float.class).invoke(p, 0, 1.0f);
+                }
+            } catch (Throwable ignored) {}
+        }
         ServerNetworking.broadcastBody(spe);
     }
 }

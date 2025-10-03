@@ -184,6 +184,8 @@ public class PlayerTickMixin {
                     int s = (int) p.getClass().getMethod("getSmallWounds").invoke(p);
                     int l = (int) p.getClass().getMethod("getLargeWounds").invoke(p);
                     boolean tq = (boolean) p.getClass().getMethod("hasTourniquet").invoke(p);
+                    // Tick stitches/tourniquet recoveries
+                    p.getClass().getMethod("tickProcedureRecovery").invoke(p);
                     if (!tq && (s + l) > 0) {
                         p.getClass().getMethod("tickWoundBleed").invoke(p);
                         int t = (int) p.getClass().getMethod("getWoundBleedTicks").invoke(p);
