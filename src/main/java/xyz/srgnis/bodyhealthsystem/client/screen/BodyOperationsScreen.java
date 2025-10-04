@@ -576,7 +576,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             // If not using the Tourniquet item and a tourniquet is present, allow removal
             var item = BodyOperationsScreen.this.handler.getItemStack();
             boolean usingTourniquetItem = !item.isEmpty() && item.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET;
-            if (!usingTourniquetItem && part.hasTourniquet()) {
+            boolean usingStitchesItem = !item.isEmpty() && item.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES;
+            if (!usingTourniquetItem && !usingStitchesItem && part.hasTourniquet()) {
                 ClientNetworking.removeTourniquet(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier());
                 BodyOperationsScreen.this.close();
                 return;

@@ -105,6 +105,10 @@ public class ServerNetworking {
             int entityId = buf.readInt();
             Identifier partId = buf.readIdentifier();
             server.execute(() -> {
+                // Block removal if player is currently using stitches
+                if (player.isUsingItem() && player.getActiveItem() != null && player.getActiveItem().getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES) {
+                    return;
+                }
                 Entity e = player.getWorld().getEntityById(entityId);
                 if (!(e instanceof BodyProvider)) return;
                 var body = ((BodyProvider) e).getBody();
@@ -130,8 +134,10 @@ public class ServerNetworking {
                         if (foot != null) foot.getClass().getMethod("setTourniquet", boolean.class).invoke(foot, false);
                     }
                 } catch (Throwable ignored) {}
-                // Refund one Tourniquet item
-                player.giveItemStack(new net.minecraft.item.ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
+                // Refund one Tourniquet item only if not using stitches item as a fallback
+                if (!(player.isUsingItem() && player.getActiveItem() != null && player.getActiveItem().getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES)) {
+                    player.giveItemStack(new net.minecraft.item.ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
+                }
                 // Sync
                 if (e instanceof PlayerEntity pe) syncBody(pe);
             });
