@@ -110,14 +110,18 @@ public class TraumaKitItem extends Item {
                     stack.decrement(1);
                     world.playSound(null, target.getBlockPos(), SoundEvents.ITEM_TOTEM_USE, SoundCategory.PLAYERS, 1.0f, 1.2f);
                 } else {
-                    // Not downed: apply its strong effect anyway
-                    for (BodyPart p : ((BodyProvider) target).getBody().getParts()) {
-                        if (p.getHealth() < p.getMaxHealth()) {
-                            p.setHealth(Math.min(p.getMaxHealth(), p.getHealth() + 3));
+                    // Not downed: apply its strong effect anyway, up to boosted effective cap
+                    var bodyProv = (BodyProvider) target;
+                    var body2 = bodyProv.getBody();
+                    for (BodyPart p : body2.getParts()) {
+                        float boost = Math.max(0.0f, body2.getBoostForPart(p.getIdentifier()));
+                        float effMax = p.getMaxHealth() + boost;
+                        if (p.getHealth() < effMax) {
+                            p.setHealth(Math.min(effMax, p.getHealth() + 3));
                         }
                     }
-                    ((BodyProvider) target).getBody().applyStatusEffectWithAmplifier(net.minecraft.entity.effect.StatusEffects.REGENERATION, 0);
-                    ((BodyProvider) target).getBody().updateHealth();
+                    body2.applyStatusEffectWithAmplifier(net.minecraft.entity.effect.StatusEffects.REGENERATION, 0);
+                    body2.updateHealth();
                     if (target instanceof PlayerEntity) {
                         ServerNetworking.syncBody((PlayerEntity) target);
                     }

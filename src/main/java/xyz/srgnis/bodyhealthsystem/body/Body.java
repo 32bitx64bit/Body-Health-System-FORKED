@@ -37,8 +37,7 @@ public abstract class Body {
     protected boolean suppressBoneBreakEvaluation = false;
     // When true, skip wound evaluation (used for bleed/necrosis damage applications)
     protected boolean suppressWoundEvaluation = false;
-    // Track last known vanilla max health to detect Health Boost/attribute changes
-    protected float lastKnownMaxHealth = -1.0f;
+
 
     // Bone system timers (server authoritative, not persisted)
     protected int boneGraceTicksRemaining = 0; // counts down after a break
@@ -677,10 +676,12 @@ public abstract class Body {
 
     public void applyRevival(int healPerPart, int bonesToFix) {
         if (!downed) return;
-        // Heal all damaged body parts by healPerPart
+        // Heal all damaged body parts by healPerPart up to boosted effective cap
         for (BodyPart p : getParts()) {
-            if (p.getHealth() < p.getMaxHealth()) {
-                p.setHealth(Math.min(p.getMaxHealth(), p.getHealth() + healPerPart));
+            float boost = Math.max(0.0f, getBoostForPart(p.getIdentifier()));
+            float effMax = p.getMaxHealth() + boost;
+            if (p.getHealth() < effMax) {
+                p.setHealth(Math.min(effMax, p.getHealth() + healPerPart));
             }
         }
         // Fix bones, preferring torso first (never head)
@@ -744,100 +745,18 @@ public abstract class Body {
         buckets.ensureAbsorptionBucketsUpToDate();
     }
 
-    protected void addAbsorptionToBuckets(float amount) {
-        if (amount <= 0.0f) return;
-        var HEAD = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD;
-        var TORSO = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO;
-        // Head and torso priority up to 2 each
-        BodyPart head = getPart(HEAD);
-        BodyPart torso = getPart(TORSO);
-        if (head != null && head.getHealth() > 0.0f) {
-            float current = absorptionBuckets.getOrDefault(HEAD, 0.0f);
-            float add = Math.min(2.0f - current, amount);
-            if (add > 0.0f) {
-                absorptionBuckets.put(HEAD, current + add);
-                amount -= add;
-            }
-        }
-        if (amount > 0.0f && torso != null && torso.getHealth() > 0.0f) {
-            float current = absorptionBuckets.getOrDefault(TORSO, 0.0f);
-            float add = Math.min(2.0f - current, amount);
-            if (add > 0.0f) {
-                absorptionBuckets.put(TORSO, current + add);
-                amount -= add;
-            }
-        }
-        // Now distribute remaining fairly across all alive parts (including head/torso)
-        java.util.List<BodyPart> alive = new java.util.ArrayList<>();
-        for (BodyPart p : getParts()) {
-            if (p.getHealth() > 0.0f) alive.add(p);
-        }
-        if (amount > 0.0f && !alive.isEmpty()) {
-            float share = amount / (float) alive.size();
-            for (BodyPart p : alive) {
-                Identifier id = p.getIdentifier();
-                float current = absorptionBuckets.getOrDefault(id, 0.0f);
-                absorptionBuckets.put(id, current + share);
-            }
-        }
-    }
 
-    private void addAliveIf(java.util.List<BodyPart> list, Identifier id) {
-        BodyPart p = getPart(id);
-        if (p != null && p.getHealth() > 0.0f) list.add(p);
-    }
+
+
 
     // ----- Health Boost distribution logic -----
     protected void ensureBoostBucketsUpToDate() {
         buckets.ensureBoostBucketsUpToDate();
     }
 
-    private void clampAllPartsToEffectiveCap() {
-        for (BodyPart p : getParts()) {
-            float boost = getBoostForPart(p.getIdentifier());
-            float cap = p.getMaxHealth() + Math.max(0.0f, boost);
-            if (p.getHealth() > cap) {
-                p.setHealth(cap);
-            }
-        }
-    }
 
-    protected void addBoostToBuckets(float amount, boolean grantHealthIgnored) {
-        if (amount <= 0.0f) return;
-        var HEAD = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD;
-        var TORSO = xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO;
-        BodyPart head = getPart(HEAD);
-        BodyPart torso = getPart(TORSO);
-        if (head != null && head.getHealth() > 0.0f) {
-            float current = boostBuckets.getOrDefault(HEAD, 0.0f);
-            float add = Math.min(2.0f - current, amount);
-            if (add > 0.0f) {
-                boostBuckets.put(HEAD, current + add);
-                amount -= add;
-            }
-        }
-        if (amount > 0.0f && torso != null && torso.getHealth() > 0.0f) {
-            float current = boostBuckets.getOrDefault(TORSO, 0.0f);
-            float add = Math.min(2.0f - current, amount);
-            if (add > 0.0f) {
-                boostBuckets.put(TORSO, current + add);
-                amount -= add;
-            }
-        }
-        // Distribute remainder across all alive parts (including head/torso)
-        java.util.List<BodyPart> alive = new java.util.ArrayList<>();
-        for (BodyPart p : getParts()) {
-            if (p.getHealth() > 0.0f) alive.add(p);
-        }
-        if (amount > 0.0f && !alive.isEmpty()) {
-            float share = amount / (float) alive.size();
-            for (BodyPart p : alive) {
-                Identifier id = p.getIdentifier();
-                float current = boostBuckets.getOrDefault(id, 0.0f);
-                boostBuckets.put(id, current + share);
-            }
-        }
-    }
+
+
 
     protected float getAbsorptionBucket(BodyPart part) {
         return buckets.bucketFor(part);

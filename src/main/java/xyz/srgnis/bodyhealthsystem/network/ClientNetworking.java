@@ -105,16 +105,17 @@ public class ClientNetworking {
                     var body = bp.getBody();
                     var part = body.getPart(idf);
                     if (part == null) return;
+                    // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
                     part.setMaxHealth(maxhealth);
+                    part.clientSetNecrosis(necState, necScale);
+                    body.clientSetAbsorptionBucket(idf, partAbs);
+                    body.clientSetBoostBucket(idf, partBoost);
                     part.setHealth(health);
                     part.setBroken(broken);
                     part.setBrokenTopHalf(hasHalf ? topHalf : null);
                     part.setFractureLocked(fractureLocked);
-                    body.clientSetAbsorptionBucket(idf, partAbs);
-                    body.clientSetBoostBucket(idf, partBoost);
                     part.clientSetWounds(sWounds, lWounds);
                     part.clientSetTourniquet(tq, tqTicks);
-                    part.clientSetNecrosis(necState, necScale);
                 });
             } catch (Exception ex) {
                 buf.readerIndex(readerIndex);
@@ -162,16 +163,17 @@ public class ClientNetworking {
                     var body = bp.getBody();
                     var part = body.getPart(idf);
                     if (part == null) return;
+                    // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
                     part.setMaxHealth(maxhealth);
+                    part.clientSetNecrosis(necState, necScale);
+                    body.clientSetAbsorptionBucket(idf, partAbs);
+                    body.clientSetBoostBucket(idf, partBoost);
                     part.setHealth(health);
                     part.setBroken(broken);
                     part.setBrokenTopHalf(hasHalf ? topHalf : null);
                     part.setFractureLocked(fractureLocked);
-                    body.clientSetAbsorptionBucket(idf, partAbs);
-                    body.clientSetBoostBucket(idf, partBoost);
                     part.clientSetWounds(sWounds, lWounds);
                     part.clientSetTourniquet(tq, tqTicks);
-                    part.clientSetNecrosis(necState, necScale);
                 });
             } catch (Exception ex) {
                 buf.readerIndex(readerIndex);
