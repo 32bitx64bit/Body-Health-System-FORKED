@@ -32,6 +32,46 @@ import static xyz.srgnis.bodyhealthsystem.util.Draw.selectTemperatureColor;
  */
 public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHandler> {
 
+    // Cache for texture availability to avoid per-frame resource lookups
+    private static final java.util.Map<Identifier, Boolean> TEX_AVAILABLE = new java.util.HashMap<>();
+    private static boolean texCacheWarmed = false;
+
+    private static void warmTextureCache() {
+        if (texCacheWarmed) return;
+        cacheTexture(TEX_BONEMAIN);
+        cacheTexture(TEX_RIBCAGE);
+        cacheTexture(TEX_SKULL);
+        cacheTexture(TEX_FOOT);
+        cacheTexture(TEX_BONEMAIN_BROKEN);
+        cacheTexture(TEX_RIBCAGE_BROKEN);
+        cacheTexture(TEX_FOOT_BROKEN);
+        cacheTexture(TEX_WOUND_SMALL);
+        cacheTexture(TEX_WOUND_LARGE);
+        texCacheWarmed = true;
+    }
+
+    private static void cacheTexture(Identifier id) {
+        var rm = MinecraftClient.getInstance().getResourceManager();
+        boolean ok = false;
+        try {
+            var opt = rm.getResource(id);
+            ok = opt.isPresent();
+        } catch (Exception ignored) {}
+        TEX_AVAILABLE.put(id, ok);
+    }
+
+    private static boolean isTextureAvailable(Identifier id) {
+        Boolean b = TEX_AVAILABLE.get(id);
+        if (b != null) return b;
+        cacheTexture(id);
+        return TEX_AVAILABLE.getOrDefault(id, false);
+    }
+
+    // Cached part rectangles (recomputed on init/resize)
+    private static final class PartRect { int x,y,w,h; PartRect(int x,int y,int w,int h){this.x=x;this.y=y;this.w=w;this.h=h;} }
+    private final java.util.Map<Identifier, PartRect> partRects = new java.util.HashMap<>();
+
+
     private static final Identifier TEX_BONEMAIN = new Identifier(BHSMain.MOD_ID, "textures/gui/bonemain.png");
     private static final Identifier TEX_RIBCAGE = new Identifier(BHSMain.MOD_ID, "textures/gui/ribcage.png");
     private static final Identifier TEX_SKULL = new Identifier(BHSMain.MOD_ID, "textures/gui/skull.png");
@@ -116,21 +156,17 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             ClientPlayNetworking.send(BHSMain.id("data_request"), buf);
         }
         computeBodyScale();
+        warmTextureCache();
+        computeGeometry();
         addWidgets();
         lastUpdateNanos = System.nanoTime();
         bodyTempC = BodyTemperatureAPI.NORMAL_BODY_TEMP_C;
     }
 
-    private void addWidgets() {
-        this.clearChildren();
-        LivingEntity target = this.handler.getEntity();
-        if (target == null) return;
-        boolean allowClick = true; // Always allow clicking parts; server-side will validate item use vs. bare removal
-
+    private void computeGeometry() {
+        partRects.clear();
         int startX = (this.width - this.backgroundWidth) / 2;
         int startY = (this.height - this.backgroundHeight) / 2;
-
-        // Compute body base inside the texture region (scaled to screen)
         int left = startX + Math.round(LEFT_INSET * DRAW_SCALE);
         int topRegion = Math.round(TOP_INSET * DRAW_SCALE);
         int bottomRegion = Math.round(BOTTOM_INSET * DRAW_SCALE);
@@ -140,18 +176,37 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int shiftY = Math.round(BODY_Y_SHIFT_LOGICAL * DRAW_SCALE);
         int baseY = top + Math.max(0, (availH - bodyHpx) / 2) - shiftY;
         int baseX = left;
+        // Build rects
+        partRects.put(PlayerBodyParts.HEAD, new PartRect(baseX + sx(GUIConstants.SCALED_HEAD_X_OFFSET), baseY + sy(GUIConstants.SCALED_HEAD_Y_OFFSET), sx(GUIConstants.SCALED_HEAD_WIDTH), sy(GUIConstants.SCALED_HEAD_HEIGHT)));
+        partRects.put(PlayerBodyParts.LEFT_ARM, new PartRect(baseX + sx(GUIConstants.SCALED_LEFT_ARM_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_ARM_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_ARM_WIDTH), sy(GUIConstants.SCALED_LEFT_ARM_HEIGHT)));
+        partRects.put(PlayerBodyParts.TORSO, new PartRect(baseX + sx(GUIConstants.SCALED_TORSO_X_OFFSET), baseY + sy(GUIConstants.SCALED_TORSO_Y_OFFSET), sx(GUIConstants.SCALED_TORSO_WIDTH), sy(GUIConstants.SCALED_TORSO_HEIGHT)));
+        partRects.put(PlayerBodyParts.RIGHT_ARM, new PartRect(baseX + sx(GUIConstants.SCALED_RIGHT_ARM_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_ARM_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_ARM_WIDTH), sy(GUIConstants.SCALED_RIGHT_ARM_HEIGHT)));
+        partRects.put(PlayerBodyParts.LEFT_LEG, new PartRect(baseX + sx(GUIConstants.SCALED_LEFT_LEG_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_LEG_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_LEG_WIDTH), sy(GUIConstants.SCALED_LEFT_LEG_HEIGHT)));
+        partRects.put(PlayerBodyParts.RIGHT_LEG, new PartRect(baseX + sx(GUIConstants.SCALED_RIGHT_LEG_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_LEG_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_LEG_WIDTH), sy(GUIConstants.SCALED_RIGHT_LEG_HEIGHT)));
+        partRects.put(PlayerBodyParts.LEFT_FOOT, new PartRect(baseX + sx(GUIConstants.SCALED_LEFT_FOOT_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_FOOT_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_FOOT_WIDTH), sy(GUIConstants.SCALED_LEFT_FOOT_HEIGHT)));
+        partRects.put(PlayerBodyParts.RIGHT_FOOT, new PartRect(baseX + sx(GUIConstants.SCALED_RIGHT_FOOT_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_FOOT_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_FOOT_WIDTH), sy(GUIConstants.SCALED_RIGHT_FOOT_HEIGHT)));
+    }
 
-        // Part hitboxes scaled to screen pixels
-        addDrawableChild(new PartButton(PlayerBodyParts.HEAD, baseX + sx(GUIConstants.SCALED_HEAD_X_OFFSET), baseY + sy(GUIConstants.SCALED_HEAD_Y_OFFSET), sx(GUIConstants.SCALED_HEAD_WIDTH), sy(GUIConstants.SCALED_HEAD_HEIGHT), allowClick));
-        addDrawableChild(new PartButton(PlayerBodyParts.LEFT_ARM, baseX + sx(GUIConstants.SCALED_LEFT_ARM_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_ARM_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_ARM_WIDTH), sy(GUIConstants.SCALED_LEFT_ARM_HEIGHT), allowClick));
-        addDrawableChild(new PartButton(PlayerBodyParts.TORSO, baseX + sx(GUIConstants.SCALED_TORSO_X_OFFSET), baseY + sy(GUIConstants.SCALED_TORSO_Y_OFFSET), sx(GUIConstants.SCALED_TORSO_WIDTH), sy(GUIConstants.SCALED_TORSO_HEIGHT), allowClick));
-        addDrawableChild(new PartButton(PlayerBodyParts.RIGHT_ARM, baseX + sx(GUIConstants.SCALED_RIGHT_ARM_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_ARM_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_ARM_WIDTH), sy(GUIConstants.SCALED_RIGHT_ARM_HEIGHT), allowClick));
-        addDrawableChild(new PartButton(PlayerBodyParts.LEFT_LEG, baseX + sx(GUIConstants.SCALED_LEFT_LEG_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_LEG_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_LEG_WIDTH), sy(GUIConstants.SCALED_LEFT_LEG_HEIGHT), allowClick));
-        addDrawableChild(new PartButton(PlayerBodyParts.RIGHT_LEG, baseX + sx(GUIConstants.SCALED_RIGHT_LEG_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_LEG_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_LEG_WIDTH), sy(GUIConstants.SCALED_RIGHT_LEG_HEIGHT), allowClick));
-        addDrawableChild(new PartButton(PlayerBodyParts.LEFT_FOOT, baseX + sx(GUIConstants.SCALED_LEFT_FOOT_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_FOOT_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_FOOT_WIDTH), sy(GUIConstants.SCALED_LEFT_FOOT_HEIGHT), allowClick));
-        addDrawableChild(new PartButton(PlayerBodyParts.RIGHT_FOOT, baseX + sx(GUIConstants.SCALED_RIGHT_FOOT_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_FOOT_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_FOOT_WIDTH), sy(GUIConstants.SCALED_RIGHT_FOOT_HEIGHT), allowClick));
+    private void addWidgets() {
+        this.clearChildren();
+        LivingEntity target = this.handler.getEntity();
+        if (target == null) return;
+        boolean allowClick = true; // Always allow clicking parts; server-side will validate item use vs. bare removal
+
+        // Part hitboxes from cached geometry
+        PartRect r;
+        r = partRects.get(PlayerBodyParts.HEAD); addDrawableChild(new PartButton(PlayerBodyParts.HEAD, r.x, r.y, r.w, r.h, allowClick));
+        r = partRects.get(PlayerBodyParts.LEFT_ARM); addDrawableChild(new PartButton(PlayerBodyParts.LEFT_ARM, r.x, r.y, r.w, r.h, allowClick));
+        r = partRects.get(PlayerBodyParts.TORSO); addDrawableChild(new PartButton(PlayerBodyParts.TORSO, r.x, r.y, r.w, r.h, allowClick));
+        r = partRects.get(PlayerBodyParts.RIGHT_ARM); addDrawableChild(new PartButton(PlayerBodyParts.RIGHT_ARM, r.x, r.y, r.w, r.h, allowClick));
+        r = partRects.get(PlayerBodyParts.LEFT_LEG); addDrawableChild(new PartButton(PlayerBodyParts.LEFT_LEG, r.x, r.y, r.w, r.h, allowClick));
+        r = partRects.get(PlayerBodyParts.RIGHT_LEG); addDrawableChild(new PartButton(PlayerBodyParts.RIGHT_LEG, r.x, r.y, r.w, r.h, allowClick));
+        r = partRects.get(PlayerBodyParts.LEFT_FOOT); addDrawableChild(new PartButton(PlayerBodyParts.LEFT_FOOT, r.x, r.y, r.w, r.h, allowClick));
+        r = partRects.get(PlayerBodyParts.RIGHT_FOOT); addDrawableChild(new PartButton(PlayerBodyParts.RIGHT_FOOT, r.x, r.y, r.w, r.h, allowClick));
 
         // Button in right panel
+        int startX = (this.width - this.backgroundWidth) / 2;
+        int startY = (this.height - this.backgroundHeight) / 2;
         int rpLeft = startX + Math.round((GUI_TEX_W - RIGHT_INSET - RIGHT_PANEL_W) * DRAW_SCALE);
         int rpTop = startY + Math.round(TOP_INSET * DRAW_SCALE);
         int btnW = Math.round(80 * DRAW_SCALE);
@@ -207,25 +262,16 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         // Draw the GUI region (195x136) scaled to background size, without sampling beyond it
         drawContext.drawTexture(TEX_HEALTHSCREEN, startX, startY, this.backgroundWidth, this.backgroundHeight, 0.0F, 0.0F, GUI_TEX_W, GUI_TEX_H, SHEET_W, SHEET_H);
 
-        // Body origin inside the texture region
-        int baseX = startX + Math.round(LEFT_INSET * DRAW_SCALE);
-        int topRegion = Math.round(TOP_INSET * DRAW_SCALE);
-        int bottomRegion = Math.round(BOTTOM_INSET * DRAW_SCALE);
-        int top = startY + topRegion;
-        int availH = this.backgroundHeight - topRegion - bottomRegion;
-        int bodyHpx = Math.round(GUIConstants.SCALED_BODY_HEIGHT * bodyScale);
-        int shiftY = Math.round(BODY_Y_SHIFT_LOGICAL * DRAW_SCALE);
-        int baseY = top + Math.max(0, (availH - bodyHpx) / 2) - shiftY;
-
-        // Draw parts with health color backgrounds and optional bone overlays
-        drawPart(drawContext, PlayerBodyParts.HEAD, baseX + sx(GUIConstants.SCALED_HEAD_X_OFFSET), baseY + sy(GUIConstants.SCALED_HEAD_Y_OFFSET), sx(GUIConstants.SCALED_HEAD_WIDTH), sy(GUIConstants.SCALED_HEAD_HEIGHT));
-        drawPart(drawContext, PlayerBodyParts.LEFT_ARM, baseX + sx(GUIConstants.SCALED_LEFT_ARM_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_ARM_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_ARM_WIDTH), sy(GUIConstants.SCALED_LEFT_ARM_HEIGHT));
-        drawPart(drawContext, PlayerBodyParts.TORSO, baseX + sx(GUIConstants.SCALED_TORSO_X_OFFSET), baseY + sy(GUIConstants.SCALED_TORSO_Y_OFFSET), sx(GUIConstants.SCALED_TORSO_WIDTH), sy(GUIConstants.SCALED_TORSO_HEIGHT));
-        drawPart(drawContext, PlayerBodyParts.RIGHT_ARM, baseX + sx(GUIConstants.SCALED_RIGHT_ARM_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_ARM_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_ARM_WIDTH), sy(GUIConstants.SCALED_RIGHT_ARM_HEIGHT));
-        drawPart(drawContext, PlayerBodyParts.LEFT_LEG, baseX + sx(GUIConstants.SCALED_LEFT_LEG_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_LEG_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_LEG_WIDTH), sy(GUIConstants.SCALED_LEFT_LEG_HEIGHT));
-        drawPart(drawContext, PlayerBodyParts.RIGHT_LEG, baseX + sx(GUIConstants.SCALED_RIGHT_LEG_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_LEG_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_LEG_WIDTH), sy(GUIConstants.SCALED_RIGHT_LEG_HEIGHT));
-        drawPart(drawContext, PlayerBodyParts.LEFT_FOOT, baseX + sx(GUIConstants.SCALED_LEFT_FOOT_X_OFFSET), baseY + sy(GUIConstants.SCALED_LEFT_FOOT_Y_OFFSET), sx(GUIConstants.SCALED_LEFT_FOOT_WIDTH), sy(GUIConstants.SCALED_LEFT_FOOT_HEIGHT));
-        drawPart(drawContext, PlayerBodyParts.RIGHT_FOOT, baseX + sx(GUIConstants.SCALED_RIGHT_FOOT_X_OFFSET), baseY + sy(GUIConstants.SCALED_RIGHT_FOOT_Y_OFFSET), sx(GUIConstants.SCALED_RIGHT_FOOT_WIDTH), sy(GUIConstants.SCALED_RIGHT_FOOT_HEIGHT));
+        // Draw parts with cached rectangles
+        PartRect r;
+        r = partRects.get(PlayerBodyParts.HEAD); drawPart(drawContext, PlayerBodyParts.HEAD, r.x, r.y, r.w, r.h);
+        r = partRects.get(PlayerBodyParts.LEFT_ARM); drawPart(drawContext, PlayerBodyParts.LEFT_ARM, r.x, r.y, r.w, r.h);
+        r = partRects.get(PlayerBodyParts.TORSO); drawPart(drawContext, PlayerBodyParts.TORSO, r.x, r.y, r.w, r.h);
+        r = partRects.get(PlayerBodyParts.RIGHT_ARM); drawPart(drawContext, PlayerBodyParts.RIGHT_ARM, r.x, r.y, r.w, r.h);
+        r = partRects.get(PlayerBodyParts.LEFT_LEG); drawPart(drawContext, PlayerBodyParts.LEFT_LEG, r.x, r.y, r.w, r.h);
+        r = partRects.get(PlayerBodyParts.RIGHT_LEG); drawPart(drawContext, PlayerBodyParts.RIGHT_LEG, r.x, r.y, r.w, r.h);
+        r = partRects.get(PlayerBodyParts.LEFT_FOOT); drawPart(drawContext, PlayerBodyParts.LEFT_FOOT, r.x, r.y, r.w, r.h);
+        r = partRects.get(PlayerBodyParts.RIGHT_FOOT); drawPart(drawContext, PlayerBodyParts.RIGHT_FOOT, r.x, r.y, r.w, r.h);
     }
 
     @Override
@@ -382,47 +428,55 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             return;
         }
 
+        PartRect rh = partRects.get(PlayerBodyParts.HEAD);
         BodyPart head = handler.getBody().getPart(PlayerBodyParts.HEAD);
         String headStr = formatHealth(head);
         int headTextW = tr.getWidth(headStr);
-        int headX = baseX + sx(GUIConstants.SCALED_HEAD_X_OFFSET) + (sx(GUIConstants.SCALED_HEAD_WIDTH) - headTextW) / 2;
-        int headY = baseY + sy(GUIConstants.SCALED_HEAD_Y_OFFSET) + (sy(GUIConstants.SCALED_HEAD_HEIGHT) - 9) / 2;
+        int headX = rh.x + (rh.w - headTextW) / 2;
+        int headY = rh.y + (rh.h - 9) / 2;
         ctx.drawTextWithShadow(tr, headStr, headX, headY, white);
 
+        PartRect rt = partRects.get(PlayerBodyParts.TORSO);
         BodyPart torso = handler.getBody().getPart(PlayerBodyParts.TORSO);
         String torsoStr = formatHealth(torso);
         int torsoTextW = tr.getWidth(torsoStr);
-        int torsoX = baseX + sx(GUIConstants.SCALED_TORSO_X_OFFSET) + (sx(GUIConstants.SCALED_TORSO_WIDTH) - torsoTextW) / 2;
-        int torsoY = baseY + sy(GUIConstants.SCALED_TORSO_Y_OFFSET) + (sy(GUIConstants.SCALED_TORSO_HEIGHT) - 9) / 2;
+        int torsoX = rt.x + (rt.w - torsoTextW) / 2;
+        int torsoY = rt.y + (rt.h - 9) / 2;
         ctx.drawTextWithShadow(tr, torsoStr, torsoX, torsoY, white);
 
+        PartRect rla = partRects.get(PlayerBodyParts.LEFT_ARM);
         BodyPart la = handler.getBody().getPart(PlayerBodyParts.LEFT_ARM);
         String laStr = formatHealth(la);
         int laTextW = tr.getWidth(laStr);
-        int laX = baseX + sx(GUIConstants.SCALED_LEFT_ARM_X_OFFSET) + (sx(GUIConstants.SCALED_LEFT_ARM_WIDTH) - laTextW) / 2;
-        int laY = baseY + sy(GUIConstants.SCALED_LEFT_ARM_Y_OFFSET) + (sy(GUIConstants.SCALED_LEFT_ARM_HEIGHT) - 9) / 2;
+        int laX = rla.x + (rla.w - laTextW) / 2;
+        int laY = rla.y + (rla.h - 9) / 2;
         ctx.drawTextWithShadow(tr, laStr, laX, laY, white);
 
+        PartRect rra = partRects.get(PlayerBodyParts.RIGHT_ARM);
         BodyPart ra = handler.getBody().getPart(PlayerBodyParts.RIGHT_ARM);
         String raStr = formatHealth(ra);
         int raTextW = tr.getWidth(raStr);
-        int raX = baseX + sx(GUIConstants.SCALED_RIGHT_ARM_X_OFFSET) + (sx(GUIConstants.SCALED_RIGHT_ARM_WIDTH) - raTextW) / 2;
-        int raY = baseY + sy(GUIConstants.SCALED_RIGHT_ARM_Y_OFFSET) + (sy(GUIConstants.SCALED_RIGHT_ARM_HEIGHT) - 9) / 2;
+        int raX = rra.x + (rra.w - raTextW) / 2;
+        int raY = rra.y + (rra.h - 9) / 2;
         ctx.drawTextWithShadow(tr, raStr, raX, raY, white);
 
+        PartRect rll = partRects.get(PlayerBodyParts.LEFT_LEG);
         BodyPart ll = handler.getBody().getPart(PlayerBodyParts.LEFT_LEG);
         String llStr = formatHealth(ll);
         int llTextW = tr.getWidth(llStr);
-        int llY = baseY + sy(GUIConstants.SCALED_LEFT_LEG_Y_OFFSET) + sy(GUIConstants.SCALED_LEFT_LEG_HEIGHT) / 2 - 4;
-        int llX = baseX + sx(GUIConstants.SCALED_LEFT_LEG_X_OFFSET) - llTextW - 2;
+        int llY = rll.y + rll.h / 2 - 4;
+        int llX = rll.x - llTextW - 2;
         ctx.drawTextWithShadow(tr, llStr, llX, llY, white);
 
+        PartRect rrl = partRects.get(PlayerBodyParts.RIGHT_LEG);
         BodyPart rl = handler.getBody().getPart(PlayerBodyParts.RIGHT_LEG);
         String rlStr = formatHealth(rl);
-        int rlY = baseY + sy(GUIConstants.SCALED_RIGHT_LEG_Y_OFFSET) + sy(GUIConstants.SCALED_RIGHT_LEG_HEIGHT) / 2 - 4;
-        int rlX = baseX + sx(GUIConstants.SCALED_RIGHT_LEG_X_OFFSET) + sx(GUIConstants.SCALED_RIGHT_LEG_WIDTH) + 2;
+        int rlY = rrl.y + rrl.h / 2 - 4;
+        int rlX = rrl.x + rrl.w + 2;
         ctx.drawTextWithShadow(tr, rlStr, rlX, rlY, white);
 
+        PartRect rlf = partRects.get(PlayerBodyParts.LEFT_FOOT);
+        PartRect rrf = partRects.get(PlayerBodyParts.RIGHT_FOOT);
         BodyPart lf = handler.getBody().getPart(PlayerBodyParts.LEFT_FOOT);
         BodyPart rf = handler.getBody().getPart(PlayerBodyParts.RIGHT_FOOT);
         String lfStr = formatHealth(lf);
@@ -430,9 +484,9 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int lfTextW = tr.getWidth(lfStr);
         int rfTextW = tr.getWidth(rfStr);
         int sep = Math.max(2, Math.round(3 * DRAW_SCALE));
-        int lfX = baseX + sx(GUIConstants.SCALED_LEFT_FOOT_X_OFFSET) + (sx(GUIConstants.SCALED_LEFT_FOOT_WIDTH) - lfTextW) / 2 - sep;
-        int rfX = baseX + sx(GUIConstants.SCALED_RIGHT_FOOT_X_OFFSET) + (sx(GUIConstants.SCALED_RIGHT_FOOT_WIDTH) - rfTextW) / 2 + sep;
-        int feetY = baseY + sy(GUIConstants.SCALED_LEFT_FOOT_Y_OFFSET) + sy(GUIConstants.SCALED_LEFT_FOOT_HEIGHT) + 2;
+        int lfX = rlf.x + (rlf.w - lfTextW) / 2 - sep;
+        int rfX = rrf.x + (rrf.w - rfTextW) / 2 + sep;
+        int feetY = rlf.y + rlf.h + 2;
         ctx.drawTextWithShadow(tr, lfStr, lfX, feetY, white);
         ctx.drawTextWithShadow(tr, rfStr, rfX, feetY, white);
     }
@@ -449,7 +503,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
 
         boolean broken = p.isBroken();
         Identifier tex = selectBoneTexture(partId, broken);
-        if (isDrawableResource(tex)) {
+        if (isTextureAvailable(tex)) {
             if (partId.equals(PlayerBodyParts.LEFT_ARM) || partId.equals(PlayerBodyParts.RIGHT_ARM)) {
                 int topH = h / 2;
                 int bottomH = h - topH;
