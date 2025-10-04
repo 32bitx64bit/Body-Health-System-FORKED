@@ -7,9 +7,9 @@ public class Screens {
     public static void registerScreens() {
         // Register unified Body Operations screen
         HandledScreens.register(ScreenHandlers.BODY_OPS_SCREEN_HANDLER, BodyOperationsScreen::new);
+        // Keep device screens
         HandledScreens.register(ScreenHandlers.AIR_CONDITIONER_SCREEN_HANDLER, AirConditionerScreen::new);
         HandledScreens.register(ScreenHandlers.SPACE_HEATER_SCREEN_HANDLER, SpaceHeaterScreen::new);
-        // Keep legacy heal screen (will be phased out)
-        HandledScreens.register(ScreenHandlers.HEAL_SCREEN_HANDLER, HealScreen::new);
+        // Legacy medkit HealScreen removed; medkit flows through BodyOperationsScreen
     }
 }
