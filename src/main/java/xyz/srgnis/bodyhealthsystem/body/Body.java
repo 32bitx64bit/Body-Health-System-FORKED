@@ -31,6 +31,8 @@ public abstract class Body {
     protected final HashMap<Identifier, Float> boostBuckets = new HashMap<>();
     protected LivingEntity entity;
 
+    private final BodyBuckets buckets = new BodyBuckets(this);
+
     // When true, skip bone-break evaluation for the current damage application
     protected boolean suppressBoneBreakEvaluation = false;
     // When true, skip wound evaluation (used for bleed/necrosis damage applications)
@@ -57,6 +59,7 @@ public abstract class Body {
         // Initialize absorption/boost buckets for this part
         absorptionBuckets.put(identifier, 0.0f);
         boostBuckets.put(identifier, 0.0f);
+        buckets.onPartAdded(identifier);
     }
 
     public BodyPart getPart(Identifier identifier){
@@ -222,6 +225,9 @@ public abstract class Body {
             if (source.getAttacker() instanceof ServerPlayerEntity spe) {
                 spe.increaseStat(Stats.DAMAGE_DEALT_ABSORBED, Math.round(consumed * 10.0f));
             }
+            if (entity instanceof net.minecraft.entity.player.PlayerEntity selfPlayer) {
+                selfPlayer.increaseStat(Stats.DAMAGE_ABSORBED, Math.round(consumed * 10.0f));
+            }
             amount -= consumed;
         }
         // Health Boost is NOT a consumable shield. It increases max health but should not reduce damage here.
@@ -243,6 +249,13 @@ public abstract class Body {
                 && !suppressBoneBreakEvaluation
                 && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
             evaluateBoneBreak(part, previousHealth, amount);
+        }
+
+        if (entity instanceof net.minecraft.entity.player.PlayerEntity player) {
+            player.addExhaustion(source.getExhaustion());
+            if (amount < 3.4028235E37f) {
+                player.increaseStat(Stats.DAMAGE_TAKEN, Math.round(amount * 10.0f));
+            }
         }
 
         entity.getDamageTracker().onDamage(source, amount);
@@ -299,7 +312,7 @@ public abstract class Body {
 
     public abstract float applyArmorToDamage(DamageSource source, float amount, BodyPart part);
 
-    public abstract void applyCriticalPartsEffect();
+
 
     // Apply bone-based negative effects and timers. Call this each tick on server.
     public void applyBrokenBonesEffects() {
@@ -581,29 +594,6 @@ public abstract class Body {
         boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining) + 320;
     }
 
-    protected int countBrokenArms() {
-        int c = 0;
-        BodyPart la = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM);
-        BodyPart ra = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM);
-        if (la != null && la.isBroken()) c++;
-        if (ra != null && ra.isBroken()) c++;
-        return c;
-    }
-
-    protected int countBrokenLegs() {
-        int c = 0;
-        BodyPart ll = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG);
-        BodyPart rl = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG);
-        if (ll != null && ll.isBroken()) c++;
-        if (rl != null && rl.isBroken()) c++;
-        return c;
-    }
-
-    protected boolean bothFeetBroken() {
-        BodyPart lf = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT);
-        BodyPart rf = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
-        return lf != null && rf != null && lf.isBroken() && rf.isBroken();
-    }
 
     protected boolean isTorsoBroken() {
         BodyPart t = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
@@ -728,17 +718,6 @@ public abstract class Body {
         }
     }
 
-    private boolean allOtherNonHeadPartsDestroyed() {
-        for (BodyPart p : getParts()) {
-            var id = p.getIdentifier();
-            if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)
-                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO)) {
-                continue;
-            }
-            if (p.getHealth() > 0.0f) return false;
-        }
-        return true;
-    }
 
     protected boolean anyBoneBroken() {
         for (BodyPart p : getParts()) {
@@ -762,36 +741,7 @@ public abstract class Body {
     // When absorption increases, we add to buckets following priority rules:
     // Head up to 4, Torso up to 4, then distribute any remainder evenly among alive limbs.
     protected void ensureAbsorptionBucketsUpToDate() {
-        // First, reclaim absorption assigned to dead parts
-        float reclaim = 0.0f;
-        for (BodyPart p : getParts()) {
-            if (p.getHealth() <= 0.0f) {
-                Identifier id = p.getIdentifier();
-                float b = absorptionBuckets.getOrDefault(id, 0.0f);
-                if (b > 0.0f) {
-                    reclaim += b;
-                    absorptionBuckets.put(id, 0.0f);
-                }
-            }
-        }
-        if (reclaim > 0.0f) {
-            addAbsorptionToBuckets(reclaim);
-        }
-
-        float totalBuckets = 0.0f;
-        for (Identifier id : absorptionBuckets.keySet()) totalBuckets += absorptionBuckets.get(id);
-        float entityAbs = entity.getAbsorptionAmount();
-        if (entityAbs > totalBuckets + 0.001f) {
-            // Need to add (entityAbs - totalBuckets) to buckets according to priority
-            float delta = entityAbs - totalBuckets;
-            addAbsorptionToBuckets(delta);
-        } else if (entityAbs + 0.001f < totalBuckets) {
-            // Clamp buckets down proportionally to entity absorption (in case of external changes)
-            float factor = entityAbs <= 0.0f ? 0.0f : (entityAbs / Math.max(totalBuckets, 0.0001f));
-            for (Identifier id : new java.util.ArrayList<>(absorptionBuckets.keySet())) {
-                absorptionBuckets.put(id, absorptionBuckets.get(id) * factor);
-            }
-        }
+        buckets.ensureAbsorptionBucketsUpToDate();
     }
 
     protected void addAbsorptionToBuckets(float amount) {
@@ -839,34 +789,7 @@ public abstract class Body {
 
     // ----- Health Boost distribution logic -----
     protected void ensureBoostBucketsUpToDate() {
-        // Reclaim from dead parts
-        float reclaim = 0.0f;
-        for (BodyPart p : getParts()) {
-            if (p.getHealth() <= 0.0f) {
-                Identifier id = p.getIdentifier();
-                float b = boostBuckets.getOrDefault(id, 0.0f);
-                if (b > 0.0f) {
-                    reclaim += b;
-                    boostBuckets.put(id, 0.0f);
-                }
-            }
-        }
-        if (reclaim > 0.0f) addBoostToBuckets(reclaim, false);
-
-        float totalBuckets = 0.0f;
-        for (Identifier id : boostBuckets.keySet()) totalBuckets += boostBuckets.get(id);
-        float extra = Math.max(0.0f, entity.getMaxHealth() - 20.0f);
-        if (extra > totalBuckets + 0.001f) {
-            float delta = extra - totalBuckets;
-            addBoostToBuckets(delta, false);
-        } else if (extra + 0.001f < totalBuckets) {
-            float factor = extra <= 0.0f ? 0.0f : (extra / Math.max(totalBuckets, 0.0001f));
-            for (Identifier id : new java.util.ArrayList<>(boostBuckets.keySet())) {
-                boostBuckets.put(id, boostBuckets.get(id) * factor);
-            }
-        }
-        // Clamp all parts to their current effective caps after any changes
-        clampAllPartsToEffectiveCap();
+        buckets.ensureBoostBucketsUpToDate();
     }
 
     private void clampAllPartsToEffectiveCap() {
@@ -917,16 +840,11 @@ public abstract class Body {
     }
 
     protected float getAbsorptionBucket(BodyPart part) {
-        if (part == null) return 0.0f;
-        return absorptionBuckets.getOrDefault(part.getIdentifier(), 0.0f);
+        return buckets.bucketFor(part);
     }
 
     protected void consumeAbsorptionFromBucket(BodyPart part, float amount) {
-        if (part == null || amount <= 0.0f) return;
-        Identifier id = part.getIdentifier();
-        float current = absorptionBuckets.getOrDefault(id, 0.0f);
-        float newVal = Math.max(0.0f, current - amount);
-        absorptionBuckets.put(id, newVal);
+        buckets.consumeAbsorption(part, amount);
     }
 
     protected float getBoostBucket(BodyPart part) {
@@ -944,42 +862,27 @@ public abstract class Body {
 
     // Expose for networking/UI
     public void prepareBucketSync() {
-        ensureAbsorptionBucketsUpToDate();
-        ensureBoostBucketsUpToDate();
+        buckets.prepareBucketSync();
     }
 
     public void clientSetAbsorptionBucket(Identifier id, float value) {
-        absorptionBuckets.put(id, Math.max(0.0f, value));
+        buckets.clientSetAbsorptionBucket(id, value);
     }
 
     public void clientSetBoostBucket(Identifier id, float value) {
-        boostBuckets.put(id, Math.max(0.0f, value));
+        buckets.clientSetBoostBucket(id, value);
     }
 
     public float getAbsorptionForPart(Identifier id) {
-        return absorptionBuckets.getOrDefault(id, 0.0f);
+        return buckets.getAbsorptionForPart(id);
     }
 
     public float getBoostForPart(Identifier id) {
-        return boostBuckets.getOrDefault(id, 0.0f);
+        return buckets.getBoostForPart(id);
     }
 
     // Called on server tick to react to max-health changes (effects/gear)
     public boolean syncBoostIfNeeded() {
-        float current = (entity != null) ? entity.getMaxHealth() : 0.0f;
-        if (lastKnownMaxHealth < 0.0f) {
-            lastKnownMaxHealth = current;
-            ensureBoostBucketsUpToDate();
-            clampAllPartsToEffectiveCap();
-            return true;
-        }
-        if (Math.abs(current - lastKnownMaxHealth) > 0.01f) {
-            lastKnownMaxHealth = current;
-            ensureBoostBucketsUpToDate();
-            clampAllPartsToEffectiveCap();
-            updateHealth();
-            return true;
-        }
-        return false;
+        return buckets.syncBoostIfNeeded();
     }
 }

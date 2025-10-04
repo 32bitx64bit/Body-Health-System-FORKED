@@ -93,10 +93,7 @@ public class PlayerBody extends Body {
         if(remaining > 0){takeDamage(remaining, source, this.getPart(TORSO));}
     }
 
-    //TODO: blindness on head critical?
-    public void applyCriticalPartsEffect(){
-        // Deprecated: Replaced by bone-based negative effects in Body.applyBrokenBonesEffects()
-    }
+
 
     public boolean isCrawlingRequired() {
         BodyPart leftLeg = getPart(LEFT_LEG);
@@ -111,77 +108,10 @@ public class PlayerBody extends Body {
 
     @Override
     public float takeDamage(float amount, DamageSource source, BodyPart part){
-
-        PlayerEntity player = (PlayerEntity)entity;
-        //applyArmor
+        // Player-specific armor processing first
         amount = applyArmorToDamage(source, amount, part);
-        float f = amount = ((ModifyAppliedDamageInvoker)entity).invokeModifyAppliedDamage(source, amount);
-
-        // Distributed absorption: allocate from the bucket of the hit part
-        ensureAbsorptionBucketsUpToDate();
-        float currentAbs = entity.getAbsorptionAmount();
-        float bucket = getAbsorptionBucket(part);
-        float consumed = Math.min(amount, bucket);
-        if (consumed > 0.0f) {
-            consumeAbsorptionFromBucket(part, consumed);
-            entity.setAbsorptionAmount(Math.max(0.0f, currentAbs - consumed));
-            // Player stat for absorbed damage (self)
-            player.increaseStat(Stats.DAMAGE_ABSORBED, Math.round(consumed * 10.0f));
-            amount -= consumed;
-        }
-        // Health Boost is NOT a consumable shield. It increases max health but should not reduce damage here.
-        if (amount == 0.0f) {
-            return 0.0f;
-        }
-
-        player.addExhaustion(source.getExhaustion());
-        player.getDamageTracker().onDamage(source, amount);
-        if (amount < 3.4028235E37f) {
-            player.increaseStat(Stats.DAMAGE_TAKEN, Math.round(amount * 10.0f));
-        }
-
-        float previousHealth = part.getHealth();
-        float remaining = (source.isOf(DamageTypes.MAGIC) && entity.hasStatusEffect(StatusEffects.POISON))
-                ? part.damageWithoutKill(amount)
-                : part.damage(amount);
-
-        // Evaluate bone break state (skull exempt). Delegate to base for consistency.
-        if (!part.getIdentifier().equals(HEAD) && !suppressBoneBreakEvaluation) {
-            // We call the base helper by mimicking Body.takeDamage flow where it runs evaluateBoneBreak
-            // Here we just reproduce the call and event to avoid duplication issues.
-            float max = part.getMaxHealth();
-            float newHealth = part.getHealth();
-            if (newHealth <= 0.0f) {
-                boolean wasBroken = part.isBroken();
-                part.setBroken(true);
-                if (part.getIdentifier().equals(LEFT_ARM) || part.getIdentifier().equals(RIGHT_ARM)) {
-                    if (part.getBrokenTopHalf() == null) part.setBrokenTopHalf(entity.getRandom().nextBoolean());
-                }
-                if (!wasBroken) this.onBoneBrokenEvent(part);
-            } else {
-                float healthRatio = previousHealth / max;
-                float baseChance = 0.0f;
-                if (healthRatio < 1.0f) {
-                    if (healthRatio >= 0.5f) {
-                        baseChance = (1.0f - healthRatio) * (0.3f / 0.5f);
-                    } else {
-                        baseChance = 0.3f + (0.5f - healthRatio) * (0.7f / 0.5f);
-                    }
-                }
-                float damageRatio = Math.min(amount / max, 1.0f);
-                float bonus = 0.15f * damageRatio;
-                float chance = Math.min(baseChance + bonus, 1.0f);
-                if (entity.getRandom().nextFloat() < chance) {
-                    boolean wasBroken = part.isBroken();
-                    part.setBroken(true);
-                    if (part.getIdentifier().equals(LEFT_ARM) || part.getIdentifier().equals(RIGHT_ARM)) {
-                        if (part.getBrokenTopHalf() == null) part.setBrokenTopHalf(entity.getRandom().nextBoolean());
-                    }
-                    if (!wasBroken) this.onBoneBrokenEvent(part);
-                }
-            }
-        }
-        return remaining;
+        // Now delegate to base shared pipeline (handles absorption, poison-specifics, bone-break, stats)
+        return super.takeDamage(amount, source, part);
     }
 
     public float applyArmorToDamage(DamageSource source, float amount, BodyPart part){
