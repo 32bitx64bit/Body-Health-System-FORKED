@@ -442,11 +442,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int color = showTemperature ? selectTemperatureColor(bodyTempC) : selectHealthColor(p);
         drawHealthRectangle(ctx, x, y, w, h, color);
 
-        // Draw wounds overlay before bones if showing health
-        if (!showTemperature) {
-            drawWounds(ctx, partId, p, x, y, w, h);
-        }
-
+        // We draw bones first, then wounds on top (for better visibility). Skip bones in temperature mode.
         if (showTemperature) return; // no bone overlay in temperature mode
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) return;
         if (!BONE_LAYER_ENABLED) return;
@@ -477,6 +473,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                 ctx.drawTexture(tex, x, y, w, h, 0.0F, 0.0F, 16, 16, 16, 16);
             }
         }
+        // Draw wounds overlay after bones so wounds are always visible
+        drawWounds(ctx, partId, p, x, y, w, h);
     }
 
     private void drawWounds(DrawContext ctx, Identifier partId, BodyPart p, int x, int y, int w, int h) {

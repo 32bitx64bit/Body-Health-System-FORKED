@@ -265,24 +265,19 @@ public abstract class Body {
         // Health ratio BEFORE the hit
         float healthRatio = previousHealth / max; // 0..1
 
-        // Base chance: 0% at 100% health, 30% at 50% health, scales linearly to 100% at 0
-        float baseChance = 0.0f;
-        if (healthRatio < 1.0f) {
-            // Map 1.0 -> 0, 0.5 -> 0.3, 0.0 -> 1.0 (monotonic increasing as health decreases)
-            if (healthRatio >= 0.5f) {
-                // Between 50% and 100% health, interpolate 0.3 -> 0
-                baseChance = (1.0f - healthRatio) * (0.3f / 0.5f); // at 0.5 -> 0.3, at 1.0 -> 0
-            } else {
-                // Below 50% health, ramp towards 100% as health goes to 0
-                baseChance = 0.3f + (0.5f - healthRatio) * (0.7f / 0.5f); // at 0.5 -> 0.3, at 0 -> 1.0
-            }
+        // Exponential scaling: low chance above 60% HP; rapidly rising near 0
+        // Target: ~15% at 60% HP, up to 50% cap near 0% HP
+        float baseChance;
+        if (healthRatio >= 0.6f) {
+            baseChance = 0.0f;
+        } else {
+            float t = (0.6f - healthRatio) / 0.6f; // 0..1 as health goes from 60% to 0%
+            baseChance = 0.15f * (float)Math.pow(t, 2.0); // quadratic ramp up to ~0.15 near 0%
         }
-
-        // Damage bonus: additional up to 15% based on incoming raw damage relative to max health
+        // Damage bonus: modest increase up to +0.10 when taking heavy hits
         float damageRatio = Math.min(rawDamage / max, 1.0f);
-        float bonus = 0.15f * damageRatio; // 0..0.15
-
-        float chance = Math.min(baseChance + bonus, 1.0f);
+        float bonus = 0.10f * damageRatio; // 0..0.10
+        float chance = Math.min(0.50f, baseChance + bonus);
 
         if (entity.getRandom().nextFloat() < chance) {
             part.setBroken(true);
