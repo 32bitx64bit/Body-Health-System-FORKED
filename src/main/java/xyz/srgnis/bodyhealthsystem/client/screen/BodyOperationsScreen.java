@@ -310,15 +310,18 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                             float nScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
                             if (s > 0 || l > 0) list.add(Text.literal("Wounds: S"+s+"/L"+l));
                             if (tq) {
-                                // Show countdowns: 7min safe, then 4min necrosis
+                                // Show countdowns: 7min safe, then 4min necrosis; tourniquetTicks is cumulative across toggles
                                 int total = tqTicks / 20;
                                 if (necState == 0) {
-                                    int remaining = Math.max(0, 7*60 - total);
+                                    // Clamp to [0, 7*60]
+                                    int totalClamped = Math.max(0, Math.min(7*60, total));
+                                    int remaining = 7*60 - totalClamped;
                                     list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (safe)"));
                                 } else if (necState == 1) {
-                                    // necrosis active; show remaining of 4 minutes
-                                    // We don't have direct necrosisTicks on client; derive from scale if needed. For simplicity, show time since start instead of exact remaining when scale not available.
-                                    int necRemaining = Math.max(0, 4*60 - Math.max(0, total - 7*60));
+                                    // Clamp necrosis elapsed to [0, 4*60]
+                                    int necElapsed = Math.max(0, total - 7*60);
+                                    necElapsed = Math.min(necElapsed, 4*60);
+                                    int necRemaining = 4*60 - necElapsed;
                                     list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (necrosis)"));
                                 } else {
                                     list.add(Text.literal("Tourniquet: 00:00 (permanent)"));

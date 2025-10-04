@@ -26,7 +26,12 @@ public abstract class BodyPart {
     private int smallWounds = 0; // combined wound cap will be 1 (small or large)
     private int largeWounds = 0;
     private boolean tourniquet = false;
-    private int tourniquetTicks = 0; // counts up while applied
+    // Tourniquet timing that supports pause/resume with credit: track on-time and accumulated off-time separately
+    private int tqOnTicks = 0; // increments only while tourniquet is applied
+    private int tqOffAccumulatedTicks = 0; // total time tourniquet was off between applications
+    private int tqOffStartTick = -1; // entity.age when removed; used to accumulate on next apply
+    // Client-only display cache for ticks (synced from server)
+    private int tqClientTicks = 0;
     // Bleeding cadence per-limb: counts ticks since last bleed application for the current wound
     private int woundBleedTicks = 0;
 
@@ -161,7 +166,8 @@ public abstract class BodyPart {
         if (smallWounds > 0) new_nbt.putInt("smallWounds", smallWounds);
         if (largeWounds > 0) new_nbt.putInt("largeWounds", largeWounds);
         if (tourniquet) new_nbt.putBoolean("tourniquet", true);
-        if (tourniquetTicks > 0) new_nbt.putInt("tourniquetTicks", tourniquetTicks);
+        if (tqOnTicks > 0) new_nbt.putInt("tqOnTicks", tqOnTicks);
+        if (tqOffAccumulatedTicks > 0) new_nbt.putInt("tqOffAccumulatedTicks", tqOffAccumulatedTicks);
         if (necrosisState != 0) new_nbt.putInt("necrosisState", necrosisState);
         if (necrosisTicks > 0) new_nbt.putInt("necrosisTicks", necrosisTicks);
         if (recoveryTicks > 0) new_nbt.putInt("recoveryTicks", recoveryTicks);
@@ -203,7 +209,9 @@ public abstract class BodyPart {
         smallWounds = nbt.contains("smallWounds") ? nbt.getInt("smallWounds") : 0;
         largeWounds = nbt.contains("largeWounds") ? nbt.getInt("largeWounds") : 0;
         tourniquet = nbt.contains("tourniquet") && nbt.getBoolean("tourniquet");
-        tourniquetTicks = nbt.contains("tourniquetTicks") ? nbt.getInt("tourniquetTicks") : 0;
+        tqOnTicks = nbt.contains("tqOnTicks") ? nbt.getInt("tqOnTicks") : 0;
+        tqOffAccumulatedTicks = nbt.contains("tqOffAccumulatedTicks") ? nbt.getInt("tqOffAccumulatedTicks") : 0;
+        tqOffStartTick = -1;
         necrosisState = nbt.contains("necrosisState") ? nbt.getInt("necrosisState") : 0;
         necrosisTicks = nbt.contains("necrosisTicks") ? nbt.getInt("necrosisTicks") : 0;
         recoveryTicks = nbt.contains("recoveryTicks") ? nbt.getInt("recoveryTicks") : 0;
@@ -311,21 +319,36 @@ public abstract class BodyPart {
 
     // ---- Tourniquet/necrosis helpers ----
     public boolean hasTourniquet() { return tourniquet; }
-    public int getTourniquetTicks() { return tourniquetTicks; }
+    public int getTourniquetTicks() {
+        try {
+            if (entity != null && entity.getWorld() != null && entity.getWorld().isClient) {
+                return Math.max(0, tqClientTicks);
+            }
+        } catch (Throwable ignored) {}
+        int eff = tqOnTicks - tqOffAccumulatedTicks;
+        if (eff < 0) eff = 0;
+        return eff;
+    }
     public void setTourniquet(boolean applied) {
         if (this.tourniquet == applied) return;
         this.tourniquet = applied;
         if (applied) {
-            this.tourniquetTicks = 0;
+            // On re-apply: accumulate the off duration as credit against elapsed
+            if (tqOffStartTick >= 0 && entity != null) {
+                int off = Math.max(0, entity.age - tqOffStartTick);
+                tqOffAccumulatedTicks = Math.min(Integer.MAX_VALUE, tqOffAccumulatedTicks + off);
+            }
+            tqOffStartTick = -1;
         } else {
-            // On removal: if in necrosis, begin recovery; if perma-dead, keep perma until notch apple
+            // Mark off start to credit this duration later
+            tqOffStartTick = (entity != null) ? entity.age : -1;
+            // If in necrosis, begin recovery phase
             if (necrosisState == 1) {
-                // 5 minutes recovery
                 this.recoveryTicks = 5 * 60 * 20;
             }
         }
     }
-    public void tickTourniquet() { if (tourniquet && tourniquetTicks < Integer.MAX_VALUE) tourniquetTicks++; }
+    public void tickTourniquet() { if (tourniquet && tqOnTicks < Integer.MAX_VALUE) tqOnTicks++; }
     public void tickWoundBleed() { if (getTotalWounds() > 0 && woundBleedTicks < Integer.MAX_VALUE) woundBleedTicks++; }
     public int getWoundBleedTicks() { return woundBleedTicks; }
     public void resetWoundBleedTicks() { woundBleedTicks = 0; }
@@ -401,7 +424,7 @@ public abstract class BodyPart {
     }
     public void clientSetTourniquet(boolean applied, int ticks) {
         this.tourniquet = applied;
-        this.tourniquetTicks = Math.max(0, ticks);
+        this.tqClientTicks = Math.max(0, ticks);
     }
     public void clientSetNecrosis(int state, float scale) {
         this.necrosisState = Math.max(0, Math.min(2, state));

@@ -157,7 +157,8 @@ public class PlayerTickMixin {
                             p.getClass().getMethod("tickRecovery").invoke(p);
                             // When fully healed, clear necrosis state for clean UI
                             int ns = (int) p.getClass().getMethod("getNecrosisState").invoke(p);
-                            if (ns == 1 && p.getMaxHealth() >= p.getBaseMaxHealth()) {
+                            float scale = (float) p.getClass().getMethod("getNecrosisScale").invoke(p);
+                            if (ns == 1 && scale >= 1.0f) {
                                 p.getClass().getMethod("clearNecrosis").invoke(p);
                             }
                         }
@@ -183,13 +184,14 @@ public class PlayerTickMixin {
                             // If necrosis active and removed, tick recovery and clear when fully healed
                             if (state == 1) {
                                 p.getClass().getMethod("tickRecovery").invoke(p);
-                                if (p.getMaxHealth() >= p.getBaseMaxHealth()) {
+                                float scale = (float) p.getClass().getMethod("getNecrosisScale").invoke(p);
+                                if (scale >= 1.0f) {
                                     p.getClass().getMethod("clearNecrosis").invoke(p);
                                 }
                             }
                         }
-                        // Always tick recovery for other sources
-                        p.getClass().getMethod("tickRecovery").invoke(p);
+                        // Always tick stitches recovery (procedure debuff)
+                        p.getClass().getMethod("tickProcedureRecovery").invoke(p);
                     } catch (Throwable ignored) {}
                 }
 
