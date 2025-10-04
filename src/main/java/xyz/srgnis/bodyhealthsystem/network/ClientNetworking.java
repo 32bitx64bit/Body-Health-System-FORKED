@@ -47,6 +47,28 @@ public class ClientNetworking {
             double tempC = buf.readDouble();
             client.execute(() -> LAST_BODY_TEMP_C.put(entityId, tempC));
         });
+
+        // Timers-only sync for tooltip updates
+        ClientPlayNetworking.registerGlobalReceiver(xyz.srgnis.bodyhealthsystem.network.TimerSync.ID_TIMERS, (client, handler, buf, sender) -> {
+            // Read flat list of parts and minimal timer state
+            while (buf.isReadable()) {
+                Identifier idf = null;
+                try {
+                    idf = buf.readIdentifier();
+                } catch (Exception ex) { break; }
+                int tqTicks = buf.readInt();
+                int necState = buf.readInt();
+                float necScale = buf.readFloat();
+                Identifier finalId = idf;
+                client.execute(() -> {
+                    var p = (client.player instanceof BodyProvider bp) ? bp.getBody().getPart(finalId) : null;
+                    if (p != null) {
+                        p.clientSetTourniquet(p.hasTourniquet(), tqTicks);
+                        p.clientSetNecrosis(necState, necScale);
+                    }
+                });
+            }
+        });
     }
 
     private static void updateEntity(MinecraftClient client, ClientPlayNetworkHandler clientPlayNetworkHandler, PacketByteBuf buf, PacketSender packetSender) {

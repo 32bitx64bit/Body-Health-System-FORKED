@@ -126,95 +126,80 @@ public class PlayerTickMixin {
             // Iterate parts
             for (BodyPart p : body.getParts()) {
                 // Tick tourniquet timer
-                try { p.getClass().getMethod("tickTourniquet").invoke(p); } catch (Throwable ignored) {}
+                p.tickTourniquet();
 
                 // Track if we should sync once per second for UI timers
-                try {
-                    boolean tqNow = (boolean) p.getClass().getMethod("hasTourniquet").invoke(p);
-                    int ns = (int) p.getClass().getMethod("getNecrosisState").invoke(p);
-                    if (tqNow || ns > 0) hasTqOrNec = true;
-                } catch (Throwable ignored) {}
+                if (p.hasTourniquet() || p.getNecrosisState() > 0) hasTqOrNec = true;
 
                 // Head special: rapid necrosis if tourniquet applied
                 if (p.getIdentifier().equals(PlayerBodyParts.HEAD)) {
-                    try {
-                        boolean tq = (boolean) p.getClass().getMethod("hasTourniquet").invoke(p);
-                        if (tq) {
-                            int tqTicks = (int) p.getClass().getMethod("getTourniquetTicks").invoke(p);
-                            if (tqTicks >= 15*20 && (int) p.getClass().getMethod("getNecrosisState").invoke(p) == 0) {
-                                p.getClass().getMethod("beginNecrosis").invoke(p);
-                            }
-                            if ((int) p.getClass().getMethod("getNecrosisState").invoke(p) == 1) {
-                                p.getClass().getMethod("tickNecrosisLinear", float.class).invoke(p, 15.0f/60.0f); // 15s to full
-                                // If fully necrotic for head -> kill player
-                                if (p.getMaxHealth() <= 0.0f) {
-                                    player.damage(player.getDamageSources().outOfWorld(), 1000.0f);
-                                    return;
-                                }
-                            }
-                        } else {
-                            // If tourniquet removed while necrosis active (healing), tick recovery via existing method
-                            p.getClass().getMethod("tickRecovery").invoke(p);
-                            // When fully healed, clear necrosis state for clean UI
-                            int ns = (int) p.getClass().getMethod("getNecrosisState").invoke(p);
-                            float scale = (float) p.getClass().getMethod("getNecrosisScale").invoke(p);
-                            if (ns == 1 && scale >= 1.0f) {
-                                p.getClass().getMethod("clearNecrosis").invoke(p);
+                    boolean tq = p.hasTourniquet();
+                    if (tq) {
+                        int tqTicks = p.getTourniquetTicks();
+                        if (tqTicks >= 15*20 && p.getNecrosisState() == 0) {
+                            p.beginNecrosis();
+                        }
+                        if (p.getNecrosisState() == 1) {
+                            p.tickNecrosisLinear(15.0f/60.0f); // 15s to full
+                            // If fully necrotic for head -> kill player
+                            if (p.getMaxHealth() <= 0.0f) {
+                                player.damage(player.getDamageSources().outOfWorld(), 1000.0f);
+                                return;
                             }
                         }
-                    } catch (Throwable ignored) {}
+                    } else {
+                        // If tourniquet removed while necrosis active (healing), tick recovery via existing method
+                        p.tickRecovery();
+                        // When fully healed, clear necrosis state for clean UI
+                        if (p.getNecrosisState() == 1 && p.getNecrosisScale() >= 1.0f) {
+                            p.clearNecrosis();
+                        }
+                    }
                 } else {
                     // Limbs: normal necrosis timeline
-                    try {
-                        boolean tq = (boolean) p.getClass().getMethod("hasTourniquet").invoke(p);
-                        int state = (int) p.getClass().getMethod("getNecrosisState").invoke(p);
-                        if (tq) {
-                            int tqTicks = (int) p.getClass().getMethod("getTourniquetTicks").invoke(p);
-                            if (state == 0 && tqTicks >= 7*60*20) {
-                                p.getClass().getMethod("beginNecrosis").invoke(p);
-                            }
-                            if (state == 1) {
-                                // 4 minutes to reduce to zero
-                                p.getClass().getMethod("tickNecrosisLinear", float.class).invoke(p, 4.0f);
-                                if (p.getMaxHealth() <= 0.0f) {
-                                    p.getClass().getMethod("setPermaDead").invoke(p);
-                                }
-                            }
-                        } else {
-                            // If necrosis active and removed, tick recovery and clear when fully healed
-                            if (state == 1) {
-                                p.getClass().getMethod("tickRecovery").invoke(p);
-                                float scale = (float) p.getClass().getMethod("getNecrosisScale").invoke(p);
-                                if (scale >= 1.0f) {
-                                    p.getClass().getMethod("clearNecrosis").invoke(p);
-                                }
-                            }
+                    boolean tq = p.hasTourniquet();
+                    int state = p.getNecrosisState();
+                    if (tq) {
+                        int tqTicks = p.getTourniquetTicks();
+                        if (state == 0 && tqTicks >= 7*60*20) {
+                            p.beginNecrosis();
                         }
-                        // Always tick stitches recovery (procedure debuff)
-                        p.getClass().getMethod("tickProcedureRecovery").invoke(p);
-                    } catch (Throwable ignored) {}
-                }
-
-                // Per-limb bleeding cadence: 15s per tick, paused by tourniquet
-                try {
-                    int s = (int) p.getClass().getMethod("getSmallWounds").invoke(p);
-                    int l = (int) p.getClass().getMethod("getLargeWounds").invoke(p);
-                    boolean tq = (boolean) p.getClass().getMethod("hasTourniquet").invoke(p);
-                    // Tick stitches/tourniquet recoveries
-                    p.getClass().getMethod("tickProcedureRecovery").invoke(p);
-                    if (!tq && (s + l) > 0) {
-                        p.getClass().getMethod("tickWoundBleed").invoke(p);
-                        int t = (int) p.getClass().getMethod("getWoundBleedTicks").invoke(p);
-                        if (t >= 15*20) {
-                            float dmg = s * 1.0f + l * 2.0f; // HP per wound type
-                            if (dmg > 0.0f) {
-                                ((Body) body).applyBleedingWithSpill(dmg, p);
-                                p.getClass().getMethod("resetWoundBleedTicks").invoke(p);
-                                anyBleed = true;
+                        if (state == 1) {
+                            // 4 minutes to reduce to zero
+                            p.tickNecrosisLinear(4.0f);
+                            if (p.getMaxHealth() <= 0.0f) {
+                                p.setPermaDead();
+                            }
+                                }
+                    } else {
+                        // If necrosis active and removed, tick recovery and clear when fully healed
+                        if (state == 1) {
+                            p.tickRecovery();
+                            if (p.getNecrosisScale() >= 1.0f) {
+                                p.clearNecrosis();
                             }
                         }
                     }
-                } catch (Throwable ignored) {}
+                    // Always tick stitches recovery (procedure debuff)
+                    p.tickProcedureRecovery();
+                }
+
+                // Per-limb bleeding cadence: 15s per tick, paused by tourniquet
+                int s = p.getSmallWounds();
+                int l = p.getLargeWounds();
+                boolean tq2 = p.hasTourniquet();
+                if (!tq2 && (s + l) > 0) {
+                    p.tickWoundBleed();
+                    int t = p.getWoundBleedTicks();
+                    if (t >= 15*20) {
+                        float dmg = s * 1.0f + l * 2.0f; // HP per wound type
+                        if (dmg > 0.0f) {
+                            ((Body) body).applyBleedingWithSpill(dmg, p);
+                            p.resetWoundBleedTicks();
+                            anyBleed = true;
+                        }
+                    }
+                }
             }
 
             if (anyBleed) {
@@ -224,8 +209,8 @@ public class PlayerTickMixin {
                 }
             }
             // Sync once per second when timers are present so the tooltip updates live
-            if ((player.age % 20) == 0 && hasTqOrNec) {
-                ServerNetworking.broadcastBody(player);
+            if ((player.age % 20) == 0 && hasTqOrNec && player instanceof ServerPlayerEntity spe2) {
+                xyz.srgnis.bodyhealthsystem.network.TimerSync.sendSelf(spe2);
             }
         }
 
