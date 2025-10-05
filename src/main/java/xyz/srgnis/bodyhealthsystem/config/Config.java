@@ -72,6 +72,10 @@ public class Config extends MidnightConfig {
     @Comment(centered = true) public static Comment comment_temperature;
     @Entry public static boolean enableTemperatureSystem = true;
 
+    @Comment(centered = true) public static Comment comment_wounds;
+    // Master toggle for wounds/tourniquets/necrosis/bleeding
+    @Entry public static boolean enableWoundingSystem = true;
+
     @Comment(centered = true) public static Comment comment_tempDisplay;
     @Entry public static TemperatureUnit temperatureUnit = TemperatureUnit.CELSIUS;
 

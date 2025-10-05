@@ -123,17 +123,18 @@ public class PlayerTickMixin {
         if (!player.getWorld().isClient) {
             boolean anyBleed = false;
             boolean hasTqOrNec = false;
+            boolean woundsEnabled = Config.enableWoundingSystem;
             // Iterate parts
             for (BodyPart p : body.getParts()) {
                 // Tick tourniquet timer
-                p.tickTourniquet();
+                if (woundsEnabled) p.tickTourniquet();
 
                 // Track if we should sync once per second for UI timers
-                if (p.hasTourniquet() || p.getNecrosisState() > 0) hasTqOrNec = true;
+                if (woundsEnabled && (p.hasTourniquet() || p.getNecrosisState() > 0)) hasTqOrNec = true;
 
                 // Head special: rapid necrosis if tourniquet applied
                 if (p.getIdentifier().equals(PlayerBodyParts.HEAD)) {
-                    boolean tq = p.hasTourniquet();
+                    boolean tq = woundsEnabled && p.hasTourniquet();
                     if (tq) {
                         int tqTicks = p.getTourniquetTicks();
                         if (tqTicks >= 15*20 && p.getNecrosisState() == 0) {
@@ -157,7 +158,7 @@ public class PlayerTickMixin {
                     }
                 } else {
                     // Limbs: normal necrosis timeline
-                    boolean tq = p.hasTourniquet();
+                    boolean tq = woundsEnabled && p.hasTourniquet();
                     int state = p.getNecrosisState();
                     if (tq) {
                         int tqTicks = p.getTourniquetTicks();
@@ -185,18 +186,20 @@ public class PlayerTickMixin {
                 }
 
                 // Per-limb bleeding cadence: 15s per tick, paused by tourniquet
-                int s = p.getSmallWounds();
-                int l = p.getLargeWounds();
-                boolean tq2 = p.hasTourniquet();
-                if (!tq2 && (s + l) > 0) {
-                    p.tickWoundBleed();
-                    int t = p.getWoundBleedTicks();
-                    if (t >= 15*20) {
-                        float dmg = s * 1.0f + l * 2.0f; // HP per wound type
-                        if (dmg > 0.0f) {
-                            ((Body) body).applyBleedingWithSpill(dmg, p);
-                            p.resetWoundBleedTicks();
-                            anyBleed = true;
+                if (woundsEnabled) {
+                    int s = p.getSmallWounds();
+                    int l = p.getLargeWounds();
+                    boolean tq2 = p.hasTourniquet();
+                    if (!tq2 && (s + l) > 0) {
+                        p.tickWoundBleed();
+                        int t = p.getWoundBleedTicks();
+                        if (t >= 15*20) {
+                            float dmg = s * 1.0f + l * 2.0f; // HP per wound type
+                            if (dmg > 0.0f) {
+                                ((Body) body).applyBleedingWithSpill(dmg, p);
+                                p.resetWoundBleedTicks();
+                                anyBleed = true;
+                            }
                         }
                     }
                 }

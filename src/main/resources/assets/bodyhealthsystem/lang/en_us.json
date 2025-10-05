@@ -129,5 +129,15 @@
   "screen.bodyhealthsystem.heater.mode_regulate": "Power: Variable",
 
   "item.bodyhealthsystem.tourniquet": "Tourniquet",
-  "item.bodyhealthsystem.stitches": "Stitches"
+  "item.bodyhealthsystem.stitches": "Stitches",
+
+  "bodyhealthsystem.midnightconfig.comment_sleep": "Sleep",
+  "bodyhealthsystem.midnightconfig.sleepBoneHealBaseChance": "Sleep bone heal base chance",
+  "bodyhealthsystem.midnightconfig.sleepBoneHealDailyIncrease": "Sleep bone heal daily increase",
+
+  "bodyhealthsystem.midnightconfig.comment_inventoryHud": "Inventory HUD",
+  "bodyhealthsystem.midnightconfig.comment_wounds": "Wounds",
+  "bodyhealthsystem.midnightconfig.enableWoundingSystem": "Enable Wounding System",
+  "bodyhealthsystem.midnightconfig.enableWoundSystem": "Enable Wounding System"
+
 }
