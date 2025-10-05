@@ -37,6 +37,8 @@ public class ServerNetworking {
         ServerLoginConnectionEvents.QUERY_START.register((handler, server, sender, synchronizer) -> {
             PacketByteBuf cfg = PacketByteBufs.create();
             cfg.writeBoolean(Config.enableTemperatureSystem);
+            cfg.writeBoolean(Config.enableBoneSystem);
+            cfg.writeBoolean(Config.enableWoundingSystem);
             sender.sendPacket(id("temp_cfg"), cfg);
         });
         ServerLoginNetworking.registerGlobalReceiver(id("temp_cfg"), (server, handler, understood, buf, synchronizer, responseSender) -> {
@@ -47,10 +49,15 @@ public class ServerNetworking {
                 }
                 return;
             }
-            boolean clientEnabled = buf.readBoolean();
-            if (Config.enableTemperatureSystem && !clientEnabled) {
+            boolean clientTemp = false;
+            try { if (buf.isReadable()) clientTemp = buf.readBoolean(); } catch (Throwable ignored) {}
+            // Consume optional client booleans for bones/wounds (server doesn't enforce)
+            try { if (buf.isReadable()) buf.readBoolean(); } catch (Throwable ignored) {}
+            try { if (buf.isReadable()) buf.readBoolean(); } catch (Throwable ignored) {}
+            if (Config.enableTemperatureSystem && !clientTemp) {
                 handler.disconnect(Text.literal("This server requires the temperature system to be enabled in Body Health System config."));
             }
+            // We do not enforce bone/wound settings; server is authoritative and client UI will mirror
         });
 
         ServerPlayConnectionEvents.JOIN.register(ServerNetworking::syncBody);
@@ -191,15 +198,12 @@ public class ServerNetworking {
             buf.writeFloat(body.getAbsorptionForPart(idf));
             buf.writeFloat(body.getBoostForPart(idf));
             // wounds/tourniquet/necrosis extra payload
-            int s = 0, l = 0, necState = 0, tqTicks = 0; boolean tq = false; float necScale = 1.0f;
-            try {
-                s = (int) part.getClass().getMethod("getSmallWounds").invoke(part);
-                l = (int) part.getClass().getMethod("getLargeWounds").invoke(part);
-                tq = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
-                tqTicks = (int) part.getClass().getMethod("getTourniquetTicks").invoke(part);
-                necState = (int) part.getClass().getMethod("getNecrosisState").invoke(part);
-                necScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
-            } catch (Throwable ignored) {}
+            int s = part.getSmallWounds();
+            int l = part.getLargeWounds();
+            boolean tq = part.hasTourniquet();
+            int tqTicks = part.getTourniquetTicks();
+            int necState = part.getNecrosisState();
+            float necScale = part.getNecrosisScale();
             buf.writeInt(s);
             buf.writeInt(l);
             buf.writeBoolean(tq);
@@ -243,15 +247,12 @@ public class ServerNetworking {
             buf.writeBoolean(part.isFractureLocked());
             buf.writeFloat(body.getAbsorptionForPart(idf));
             buf.writeFloat(body.getBoostForPart(idf));
-            int s = 0, l = 0, necState = 0, tqTicks = 0; boolean tq = false; float necScale = 1.0f;
-            try {
-                s = (int) part.getClass().getMethod("getSmallWounds").invoke(part);
-                l = (int) part.getClass().getMethod("getLargeWounds").invoke(part);
-                tq = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
-                tqTicks = (int) part.getClass().getMethod("getTourniquetTicks").invoke(part);
-                necState = (int) part.getClass().getMethod("getNecrosisState").invoke(part);
-                necScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
-            } catch (Throwable ignored) {}
+            int s = part.getSmallWounds();
+            int l = part.getLargeWounds();
+            boolean tq = part.hasTourniquet();
+            int tqTicks = part.getTourniquetTicks();
+            int necState = part.getNecrosisState();
+            float necScale = part.getNecrosisScale();
             buf.writeInt(s);
             buf.writeInt(l);
             buf.writeBoolean(tq);

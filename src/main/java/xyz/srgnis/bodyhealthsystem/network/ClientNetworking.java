@@ -30,13 +30,17 @@ public class ClientNetworking {
     public static void initialize(){
         // Login-time config sync: server tells us if temperature system is required/enabled.
         ClientLoginNetworking.registerGlobalReceiver(id("temp_cfg"), (client, handler, buf, responseSender) -> {
-            boolean serverEnabled = buf.readBoolean();
-            // Mirror server setting clientside so UI/logic stays consistent
-            Config.enableTemperatureSystem = serverEnabled;
-            // Persist to disk so future sessions match the server automatically
-            try { MidnightConfig.write(BHSMain.MOD_ID); } catch (Throwable ignored) {}
+            boolean serverTemp = buf.readBoolean();
+            boolean serverBones = buf.readBoolean();
+            boolean serverWounds = buf.readBoolean();
+            // Mirror server-required toggles clientside for UI/logic during this session only
+            Config.enableTemperatureSystem = serverTemp;
+            Config.enableBoneSystem = serverBones;
+            Config.enableWoundingSystem = serverWounds;
             PacketByteBuf reply = PacketByteBufs.create();
             reply.writeBoolean(Config.enableTemperatureSystem);
+            reply.writeBoolean(Config.enableBoneSystem);
+            reply.writeBoolean(Config.enableWoundingSystem);
             return CompletableFuture.completedFuture(reply);
         });
 
@@ -81,47 +85,7 @@ public class ClientNetworking {
             return;
         }
         // Read all parts first; remaining payload contains downed sync and temperature
-        while (buf.isReadable()) {
-            int readerIndex = buf.readerIndex();
-            try {
-                Identifier idf = buf.readIdentifier();
-                float health = buf.readFloat();
-                float maxhealth = buf.readFloat();
-                boolean broken = buf.readBoolean();
-                boolean hasHalf = buf.readBoolean();
-                boolean topHalf = hasHalf && buf.readBoolean();
-                boolean fractureLocked = buf.readBoolean();
-                float partAbs = buf.readFloat();
-                float partBoost = buf.readFloat();
-                // Optional wounds/tourniquet/necrosis payload
-                int sWounds = buf.readInt();
-                int lWounds = buf.readInt();
-                boolean tq = buf.readBoolean();
-                int tqTicks = buf.readInt();
-                int necState = buf.readInt();
-                float necScale = buf.readFloat();
-                client.execute(() -> {
-                    if (!(entity instanceof BodyProvider bp)) return;
-                    var body = bp.getBody();
-                    var part = body.getPart(idf);
-                    if (part == null) return;
-                    // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
-                    part.setMaxHealth(maxhealth);
-                    part.clientSetNecrosis(necState, necScale);
-                    body.clientSetAbsorptionBucket(idf, partAbs);
-                    body.clientSetBoostBucket(idf, partBoost);
-                    part.setHealth(health);
-                    part.setBroken(broken);
-                    part.setBrokenTopHalf(hasHalf ? topHalf : null);
-                    part.setFractureLocked(fractureLocked);
-                    part.clientSetWounds(sWounds, lWounds);
-                    part.clientSetTourniquet(tq, tqTicks);
-                });
-            } catch (Exception ex) {
-                buf.readerIndex(readerIndex);
-                break;
-            }
-        }
+        readBodyPayload(client, entity, buf);
         if (buf.isReadable()) {
             boolean downed = buf.readBoolean();
             int bleed = buf.readInt();
@@ -140,46 +104,7 @@ public class ClientNetworking {
 
     public static void handleHealthChange(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender sender){
         // Read all parts; remaining payload contains optional downed sync and temperature
-        while (buf.isReadable()) {
-            int readerIndex = buf.readerIndex();
-            try {
-                Identifier idf = buf.readIdentifier();
-                float health = buf.readFloat();
-                float maxhealth = buf.readFloat();
-                boolean broken = buf.readBoolean();
-                boolean hasHalf = buf.readBoolean();
-                boolean topHalf = hasHalf && buf.readBoolean();
-                boolean fractureLocked = buf.readBoolean();
-                float partAbs = buf.readFloat();
-                float partBoost = buf.readFloat();
-                int sWounds = buf.readInt();
-                int lWounds = buf.readInt();
-                boolean tq = buf.readBoolean();
-                int tqTicks = buf.readInt();
-                int necState = buf.readInt();
-                float necScale = buf.readFloat();
-                client.execute(() -> {
-                    if (!(client.player instanceof BodyProvider bp)) return;
-                    var body = bp.getBody();
-                    var part = body.getPart(idf);
-                    if (part == null) return;
-                    // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
-                    part.setMaxHealth(maxhealth);
-                    part.clientSetNecrosis(necState, necScale);
-                    body.clientSetAbsorptionBucket(idf, partAbs);
-                    body.clientSetBoostBucket(idf, partBoost);
-                    part.setHealth(health);
-                    part.setBroken(broken);
-                    part.setBrokenTopHalf(hasHalf ? topHalf : null);
-                    part.setFractureLocked(fractureLocked);
-                    part.clientSetWounds(sWounds, lWounds);
-                    part.clientSetTourniquet(tq, tqTicks);
-                });
-            } catch (Exception ex) {
-                buf.readerIndex(readerIndex);
-                break;
-            }
-        }
+        readBodyPayload(client, client.player, buf);
         if (buf.isReadable()) {
             boolean downed = buf.readBoolean();
             int bleed = buf.readInt();
@@ -224,5 +149,49 @@ public class ClientNetworking {
     public static Double getLastBodyTempC(Entity entity) {
         if (entity == null) return null;
         return LAST_BODY_TEMP_C.get(entity.getId());
+    }
+
+    // Shared body payload reader for both full-state packet handlers
+    private static void readBodyPayload(MinecraftClient client, Entity entity, PacketByteBuf buf) {
+        while (buf.isReadable()) {
+            int readerIndex = buf.readerIndex();
+            try {
+                Identifier idf = buf.readIdentifier();
+                float health = buf.readFloat();
+                float maxhealth = buf.readFloat();
+                boolean broken = buf.readBoolean();
+                boolean hasHalf = buf.readBoolean();
+                boolean topHalf = hasHalf && buf.readBoolean();
+                boolean fractureLocked = buf.readBoolean();
+                float partAbs = buf.readFloat();
+                float partBoost = buf.readFloat();
+                int sWounds = buf.readInt();
+                int lWounds = buf.readInt();
+                boolean tq = buf.readBoolean();
+                int tqTicks = buf.readInt();
+                int necState = buf.readInt();
+                float necScale = buf.readFloat();
+                client.execute(() -> {
+                    if (!(entity instanceof BodyProvider bp)) return;
+                    var body = bp.getBody();
+                    var part = body.getPart(idf);
+                    if (part == null) return;
+                    // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
+                    part.setMaxHealth(maxhealth);
+                    part.clientSetNecrosis(necState, necScale);
+                    body.clientSetAbsorptionBucket(idf, partAbs);
+                    body.clientSetBoostBucket(idf, partBoost);
+                    part.setHealth(health);
+                    part.setBroken(broken);
+                    part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                    part.setFractureLocked(fractureLocked);
+                    part.clientSetWounds(sWounds, lWounds);
+                    part.clientSetTourniquet(tq, tqTicks);
+                });
+            } catch (Exception ex) {
+                buf.readerIndex(readerIndex);
+                break;
+            }
+        }
     }
 }
