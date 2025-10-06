@@ -451,10 +451,47 @@ public abstract class Body {
         }
     }
 
-    // Apply bleeding damage with spillover rules (avoid head unless last remaining)
+    // Apply bleeding damage with spillover rules
+    // If torso is the bleeding source, prefer damaging limbs (arms/legs/feet) before torso.
+    // Otherwise, apply to target first, then spill to limbs, then torso, then head last.
     public void applyBleedingWithSpill(float amount, BodyPart target) {
         if (!(entity instanceof net.minecraft.entity.player.PlayerEntity player)) return;
         if (amount <= 0.0f || target == null) return;
+
+        BodyPart head = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+        BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+        boolean targetIsTorso = (torso != null && target.getIdentifier().equals(torso.getIdentifier()));
+
+        if (targetIsTorso) {
+            // Route bleeding from torso to limbs first; only damage torso if no limbs remain or after limbs are exhausted
+            java.util.List<BodyPart> limbs = new java.util.ArrayList<>();
+            for (BodyPart p : getParts()) {
+                if (p == torso) continue;
+                if (p == head) continue;
+                if (p.getHealth() <= 0.0f) continue;
+                limbs.add(p);
+            }
+            java.util.Random rnd = entity.getRandom();
+            // Iteratively consume amount across random limbs
+            while (amount > 0.0f && !limbs.isEmpty()) {
+                BodyPart limb = limbs.get(rnd.nextInt(limbs.size()));
+                float hpL = limb.getHealth();
+                if (hpL <= 0.0f) { limbs.remove(limb); continue; }
+                float apply = Math.min(amount, hpL);
+                applyBleedingDamageTo(player, limb, apply);
+                amount -= apply;
+                if (apply >= hpL) limbs.remove(limb);
+            }
+            // If anything remains and torso is still alive, apply the rest to torso
+            if (amount > 0.0f && torso != null && torso.getHealth() > 0.0f) {
+                float apply = Math.min(amount, torso.getHealth());
+                applyBleedingDamageTo(player, torso, apply);
+                amount -= apply;
+            }
+            return;
+        }
+
+        // Default: apply to target first
         float hp = target.getHealth();
         if (hp > 0.0f) {
             float apply = Math.min(amount, hp);
@@ -465,8 +502,6 @@ public abstract class Body {
         // Choose spillover target: prefer non-head, non-torso limbs; only include torso if no other limbs available; head only as last resort
         java.util.List<BodyPart> limbCandidates = new java.util.ArrayList<>();
         java.util.List<BodyPart> torsoCandidate = new java.util.ArrayList<>();
-        BodyPart head = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
-        BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
         for (BodyPart p : getParts()) {
             if (p == target) continue;
             if (p.getHealth() <= 0.0f) continue;
