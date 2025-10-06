@@ -7,7 +7,7 @@ public class Config extends MidnightConfig {
     @Server @Entry public static int configVersion = 0;
 
     @Comment(centered = true) public static Comment comment_maxHealth;
-    @Entry public static float headMaxHealth = 4;
+    @Entry public static float headMaxHealth = 5;
     @Entry public static float torsoMaxHealth = 6;
     @Entry public static float legMaxHealth = 4;
     @Entry public static float armMaxHealth = 4;

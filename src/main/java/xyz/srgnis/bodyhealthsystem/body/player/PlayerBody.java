@@ -63,6 +63,13 @@ public class PlayerBody extends Body {
             Vec3d norm = ProjectileHitTracker.getLastHit((PlayerEntity) entity);
             BodyPart part = selectPartFromNormalized(norm);
             if (part != null) {
+                // Head-hit mitigation: 40% chance to redirect to torso for arrows/tridents/mob projectiles
+                if (part.getIdentifier().equals(HEAD)) {
+                    var torso = getPart(TORSO);
+                    if (torso != null && entity.getRandom().nextDouble() < 0.40) {
+                        part = torso;
+                    }
+                }
                 applyDamageLocal(amount, source, part);
                 if (!entity.getWorld().isClient && xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(part, true);
             } else {
