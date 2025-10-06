@@ -471,7 +471,7 @@ public abstract class Body {
                 if (p.getHealth() <= 0.0f) continue;
                 limbs.add(p);
             }
-            java.util.Random rnd = entity.getRandom();
+            net.minecraft.util.math.random.Random rnd = entity.getRandom();
             // Iteratively consume amount across random limbs
             while (amount > 0.0f && !limbs.isEmpty()) {
                 BodyPart limb = limbs.get(rnd.nextInt(limbs.size()));
