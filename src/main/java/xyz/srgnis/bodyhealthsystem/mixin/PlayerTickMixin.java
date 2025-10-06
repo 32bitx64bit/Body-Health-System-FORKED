@@ -194,14 +194,21 @@ public class PlayerTickMixin {
                     boolean tq2 = p.hasTourniquet();
                     if (!tq2 && (s + l) > 0) {
                         p.tickWoundBleed();
-                        int t = p.getWoundBleedTicks();
-                        if (t >= 15*20) {
-                            float dmg = s * 1.0f + l * 2.0f; // HP per wound type
-                            if (dmg > 0.0f) {
-                                ((Body) body).applyBleedingWithSpill(dmg, p);
-                                p.resetWoundBleedTicks();
-                                anyBleed = true;
-                            }
+                        p.tickWoundBleedLarge();
+                        int tS = p.getWoundBleedTicks();
+                        int tL = p.getWoundBleedTicksLarge();
+                        float dmg = 0.0f;
+                        if (tS >= 15*20 && s > 0) {
+                            dmg += s * 1.0f;
+                            p.resetWoundBleedTicks();
+                        }
+                        if (tL >= 150 && l > 0) { // 7.5 seconds = 150 ticks
+                            dmg += l * 1.0f;
+                            p.resetWoundBleedTicksLarge();
+                        }
+                        if (dmg > 0.0f) {
+                            ((Body) body).applyBleedingWithSpill(dmg, p);
+                            anyBleed = true;
                         }
                     }
                 }

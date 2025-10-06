@@ -64,6 +64,7 @@ public class Config extends MidnightConfig {
     @Entry public static int hudXOffset = 0;
     @Entry public static int hudYOffset = 0;
     @Entry public static float hudScale = 1;
+    @Entry public static boolean hudOnlyWhenDamaged = false;
     @Entry public static boolean hiddeVanillaHealth = true;
 
     @Comment(centered = true) public static Comment comment_inventoryHud;

@@ -24,74 +24,103 @@ public class BHSHud implements HudRenderCallback {
     //TODO: select color in the parts
     @Override
     public void onHudRender(DrawContext drawContext, float v) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        var im = mc.interactionManager;
+        var screen = mc.currentScreen;
+
         // Revive progress bar under crosshair (no texture needed)
         float reviveProgress = getReviveProgressClient();
         if (reviveProgress > 0f) {
             drawReviveProgress(drawContext, reviveProgress);
         }
 
-        // Hide the always-on HUD when the player inventory screen is open to avoid confusion with the inventory-side HUD
-        // Only hide if the inventory HUD is enabled in config
+        // Hide the always-on HUD when the inventory screen is open and inventory HUD is enabled
         if (xyz.srgnis.bodyhealthsystem.config.Config.showInventoryBodyHud &&
-                MinecraftClient.getInstance().currentScreen instanceof net.minecraft.client.gui.screen.ingame.InventoryScreen) {
+                screen instanceof net.minecraft.client.gui.screen.ingame.InventoryScreen) {
             return;
         }
 
-        setHudCords();
-        BodyProvider player = (BodyProvider)MinecraftClient.getInstance().player;
+        PlayerEntity pe = mc.player;
+        if (pe == null || im == null || !im.hasStatusBars()) return;
+        if (!(pe instanceof BodyProvider provider)) return;
+        var body = provider.getBody();
+        if (body == null) return;
 
-        if (player != null) {
-            if (MinecraftClient.getInstance().interactionManager.hasStatusBars()) {
-                int color;
-                drawContext.getMatrices().push();
-                drawContext.getMatrices().translate(0,0,-1);
-                drawContext.getMatrices().scale(Config.hudScale, Config.hudScale, 1);
-                //head
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.HEAD));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.HEAD_X_OFFSET, startY+ GUIConstants.HEAD_Y_OFFSET, GUIConstants.HEAD_WIDTH, GUIConstants.HEAD_HEIGHT, color);
-                //arm
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.LEFT_ARM));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.LEFT_ARM_X_OFFSET, startY+ GUIConstants.LEFT_ARM_Y_OFFSET, GUIConstants.LEFT_ARM_WIDTH, GUIConstants.LEFT_ARM_HEIGHT, color);
-                //torso
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.TORSO));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.TORSO_X_OFFSET, startY+ GUIConstants.TORSO_Y_OFFSET, GUIConstants.TORSO_WIDTH, GUIConstants.TORSO_HEIGHT, color);
-                //arm
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.RIGHT_ARM));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.RIGHT_ARM_X_OFFSET, startY+ GUIConstants.RIGHT_ARM_Y_OFFSET, GUIConstants.RIGHT_ARM_WIDTH, GUIConstants.RIGHT_ARM_HEIGHT, color);
-                //legs
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.LEFT_LEG));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.LEFT_LEG_X_OFFSET, startY+ GUIConstants.LEFT_LEG_Y_OFFSET, GUIConstants.LEFT_LEG_WIDTH, GUIConstants.LEFT_LEG_HEIGHT, color);
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.RIGHT_LEG));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.RIGHT_LEG_X_OFFSET, startY+ GUIConstants.RIGHT_LEG_Y_OFFSET, GUIConstants.RIGHT_LEG_WIDTH, GUIConstants.RIGHT_LEG_HEIGHT, color);
-                //foot
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.LEFT_FOOT));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.LEFT_FOOT_X_OFFSET, startY+ GUIConstants.LEFT_FOOT_Y_OFFSET, GUIConstants.LEFT_FOOT_WIDTH, GUIConstants.LEFT_FOOT_HEIGHT, color);
-                color = selectHealthColor(player.getBody().getPart(PlayerBodyParts.RIGHT_FOOT));
-                drawHealthRectangle(drawContext, startX+ GUIConstants.RIGHT_FOOT_X_OFFSET, startY+ GUIConstants.RIGHT_FOOT_Y_OFFSET, GUIConstants.RIGHT_FOOT_WIDTH, GUIConstants.RIGHT_FOOT_HEIGHT, color);
-                drawContext.getMatrices().pop();
+        // Optional: draw only when damaged or broken
+        if (Config.hudOnlyWhenDamaged) {
+            boolean anyDamaged = false;
+            for (var p : body.getParts()) {
+                if (p.isDamaged() || p.isBroken()) { anyDamaged = true; break; }
             }
+            if (!anyDamaged) return;
         }
+
+        // Compute scaled anchor-corrected coordinates
+        setHudCords();
+
+        drawContext.getMatrices().push();
+        drawContext.getMatrices().translate(0, 0, -1);
+        drawContext.getMatrices().scale(Config.hudScale, Config.hudScale, 1);
+
+        int color;
+        // head
+        color = selectHealthColor(body.getPart(PlayerBodyParts.HEAD));
+        drawHealthRectangle(drawContext, startX + GUIConstants.HEAD_X_OFFSET, startY + GUIConstants.HEAD_Y_OFFSET, GUIConstants.HEAD_WIDTH, GUIConstants.HEAD_HEIGHT, color);
+        // left arm
+        color = selectHealthColor(body.getPart(PlayerBodyParts.LEFT_ARM));
+        drawHealthRectangle(drawContext, startX + GUIConstants.LEFT_ARM_X_OFFSET, startY + GUIConstants.LEFT_ARM_Y_OFFSET, GUIConstants.LEFT_ARM_WIDTH, GUIConstants.LEFT_ARM_HEIGHT, color);
+        // torso
+        color = selectHealthColor(body.getPart(PlayerBodyParts.TORSO));
+        drawHealthRectangle(drawContext, startX + GUIConstants.TORSO_X_OFFSET, startY + GUIConstants.TORSO_Y_OFFSET, GUIConstants.TORSO_WIDTH, GUIConstants.TORSO_HEIGHT, color);
+        // right arm
+        color = selectHealthColor(body.getPart(PlayerBodyParts.RIGHT_ARM));
+        drawHealthRectangle(drawContext, startX + GUIConstants.RIGHT_ARM_X_OFFSET, startY + GUIConstants.RIGHT_ARM_Y_OFFSET, GUIConstants.RIGHT_ARM_WIDTH, GUIConstants.RIGHT_ARM_HEIGHT, color);
+        // legs
+        color = selectHealthColor(body.getPart(PlayerBodyParts.LEFT_LEG));
+        drawHealthRectangle(drawContext, startX + GUIConstants.LEFT_LEG_X_OFFSET, startY + GUIConstants.LEFT_LEG_Y_OFFSET, GUIConstants.LEFT_LEG_WIDTH, GUIConstants.LEFT_LEG_HEIGHT, color);
+        color = selectHealthColor(body.getPart(PlayerBodyParts.RIGHT_LEG));
+        drawHealthRectangle(drawContext, startX + GUIConstants.RIGHT_LEG_X_OFFSET, startY + GUIConstants.RIGHT_LEG_Y_OFFSET, GUIConstants.RIGHT_LEG_WIDTH, GUIConstants.RIGHT_LEG_HEIGHT, color);
+        // feet
+        color = selectHealthColor(body.getPart(PlayerBodyParts.LEFT_FOOT));
+        drawHealthRectangle(drawContext, startX + GUIConstants.LEFT_FOOT_X_OFFSET, startY + GUIConstants.LEFT_FOOT_Y_OFFSET, GUIConstants.LEFT_FOOT_WIDTH, GUIConstants.LEFT_FOOT_HEIGHT, color);
+        color = selectHealthColor(body.getPart(PlayerBodyParts.RIGHT_FOOT));
+        drawHealthRectangle(drawContext, startX + GUIConstants.RIGHT_FOOT_X_OFFSET, startY + GUIConstants.RIGHT_FOOT_Y_OFFSET, GUIConstants.RIGHT_FOOT_WIDTH, GUIConstants.RIGHT_FOOT_HEIGHT, color);
+
+        drawContext.getMatrices().pop();
     }
 
     private static void setHudCords(){
+        MinecraftClient mc = MinecraftClient.getInstance();
+        int sw = mc.getWindow().getScaledWidth();
+        int sh = mc.getWindow().getScaledHeight();
+
+        float scale = Math.max(0.1f, Config.hudScale);
+        float inv = 1.0f / scale;
+
+        int bodyWpx = Math.round(GUIConstants.BODY_WIDTH * scale);
+        int bodyHpx = Math.round(GUIConstants.BODY_HEIGHT * scale);
+
+        int pxX = 0, pxY = 0;
         switch (Config.hudPosition){
-            case TOP_LEFT:
-                startX = Config.hudXOffset;
-                startY = Config.hudYOffset;
-                break;
-            case TOP_RIGHT:
-                startX = MinecraftClient.getInstance().getWindow().getScaledWidth()- GUIConstants.BODY_WIDTH-Config.hudXOffset;
-                startY = Config.hudYOffset;
-                break;
-            case BOTTOM_LEFT:
-                startX = Config.hudXOffset;
-                startY = MinecraftClient.getInstance().getWindow().getScaledHeight()- GUIConstants.BODY_HEIGHT-Config.hudYOffset;
-                break;
-            case BOTTOM_RIGHT:
-                startX = MinecraftClient.getInstance().getWindow().getScaledWidth()- GUIConstants.BODY_WIDTH-Config.hudXOffset;
-                startY = MinecraftClient.getInstance().getWindow().getScaledHeight()- GUIConstants.BODY_HEIGHT-Config.hudYOffset;
-                break;
+            case TOP_LEFT -> {
+                pxX = Config.hudXOffset;
+                pxY = Config.hudYOffset;
+            }
+            case TOP_RIGHT -> {
+                pxX = sw - bodyWpx - Config.hudXOffset;
+                pxY = Config.hudYOffset;
+            }
+            case BOTTOM_LEFT -> {
+                pxX = Config.hudXOffset;
+                pxY = sh - bodyHpx - Config.hudYOffset;
+            }
+            case BOTTOM_RIGHT -> {
+                pxX = sw - bodyWpx - Config.hudXOffset;
+                pxY = sh - bodyHpx - Config.hudYOffset;
+            }
         }
+        startX = Math.round(pxX * inv);
+        startY = Math.round(pxY * inv);
     }
 
     private float getReviveProgressClient() {

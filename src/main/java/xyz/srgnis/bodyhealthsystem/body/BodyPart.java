@@ -34,6 +34,8 @@ public abstract class BodyPart {
     private int tqClientTicks = 0;
     // Bleeding cadence per-limb: counts ticks since last bleed application for the current wound
     private int woundBleedTicks = 0;
+    // Separate cadence for large wounds (7.5s)
+    private int woundBleedTicksLarge = 0;
 
     // Necrosis: 0=none, 1=active (reducing max), 2=perma-dead (max==0 until reset)
     private int necrosisState = 0;
@@ -352,6 +354,11 @@ public abstract class BodyPart {
     public void tickWoundBleed() { if (getTotalWounds() > 0 && woundBleedTicks < Integer.MAX_VALUE) woundBleedTicks++; }
     public int getWoundBleedTicks() { return woundBleedTicks; }
     public void resetWoundBleedTicks() { woundBleedTicks = 0; }
+
+    // Large-wound cadence
+    public void tickWoundBleedLarge() { if (getLargeWounds() > 0 && woundBleedTicksLarge < Integer.MAX_VALUE) woundBleedTicksLarge++; }
+    public int getWoundBleedTicksLarge() { return woundBleedTicksLarge; }
+    public void resetWoundBleedTicksLarge() { woundBleedTicksLarge = 0; }
 
     public int getNecrosisState() { return necrosisState; }
     public float getNecrosisScale() { return necrosisScale; }

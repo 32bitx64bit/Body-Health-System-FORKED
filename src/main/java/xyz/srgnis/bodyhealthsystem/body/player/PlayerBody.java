@@ -64,18 +64,18 @@ public class PlayerBody extends Body {
             BodyPart part = selectPartFromNormalized(norm);
             if (part != null) {
                 applyDamageLocal(amount, source, part);
-                if (xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(part, true);
+                if (!entity.getWorld().isClient && xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(part, true);
             } else {
                 BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
                 applyDamageLocal(amount, source, p);
-                if (xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(p, true);
+                if (!entity.getWorld().isClient && xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(p, true);
             }
             // Clear after consumption to avoid stale data
             ProjectileHitTracker.clear((PlayerEntity) entity);
         } else {
             BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
             applyDamageLocal(amount, source, p);
-            if (xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(p, false);
+            if (!entity.getWorld().isClient && xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(p, false);
         }
 
     }
@@ -130,6 +130,7 @@ public class PlayerBody extends Body {
     private void applyWoundChances(BodyPart part, boolean projectile) {
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) return;
         if (suppressWoundEvaluation || part == null) return;
+        if (entity.getWorld().isClient) return;
         double multiplier = 1.0;
         var id = part.getIdentifier();
         if (id.equals(LEFT_FOOT) || id.equals(RIGHT_FOOT)) multiplier = 0.75;
