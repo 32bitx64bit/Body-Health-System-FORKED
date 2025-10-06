@@ -124,6 +124,7 @@ public class PlayerTickMixin {
             boolean anyBleed = false;
             boolean hasTqOrNec = false;
             boolean woundsEnabled = Config.enableWoundingSystem;
+            int totalWounds = 0;
             // Iterate parts
             for (BodyPart p : body.getParts()) {
                 // Tick tourniquet timer
@@ -189,6 +190,7 @@ public class PlayerTickMixin {
                 if (woundsEnabled) {
                     int s = p.getSmallWounds();
                     int l = p.getLargeWounds();
+                    totalWounds += Math.min(1, s) + Math.min(1, l);
                     boolean tq2 = p.hasTourniquet();
                     if (!tq2 && (s + l) > 0) {
                         p.tickWoundBleed();
@@ -203,6 +205,18 @@ public class PlayerTickMixin {
                         }
                     }
                 }
+            }
+
+            if (woundsEnabled) {
+                // Visual indicator only: Bleeding effect with amplifier 0..4 (represents 1..5)
+                int amp = Math.max(0, Math.min(4, totalWounds - 1));
+                if (totalWounds > 0) {
+                    player.addStatusEffect(new StatusEffectInstance(ModStatusEffects.BLEEDING_EFFECT, 40, amp, false, true, true));
+                } else {
+                    player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);
+                }
+            } else {
+                player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);
             }
 
             if (anyBleed) {

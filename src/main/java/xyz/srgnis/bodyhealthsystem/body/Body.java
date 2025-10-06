@@ -246,6 +246,7 @@ public abstract class Body {
         // After damage is applied, evaluate bone break chance (except skull)
         if (!part.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)
                 && !suppressBoneBreakEvaluation
+                && !suppressWoundEvaluation
                 && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
             evaluateBoneBreak(part, previousHealth, amount);
         }
