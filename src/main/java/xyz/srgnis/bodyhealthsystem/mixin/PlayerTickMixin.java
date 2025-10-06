@@ -216,8 +216,14 @@ public class PlayerTickMixin {
 
             if (woundsEnabled) {
                 // Visual indicator only: Bleeding effect with amplifier 0..4 (represents 1..5)
-                int amp = Math.max(0, Math.min(4, totalWounds - 1));
-                if (totalWounds > 0) {
+                // Reduce severity for parts with tourniquets (they pause bleed); approximate by subtracting count of tourniqueted wounded parts.
+                int tqSuppressed = 0;
+                for (BodyPart p : body.getParts()) {
+                    if ((p.getSmallWounds() + p.getLargeWounds()) > 0 && p.hasTourniquet()) tqSuppressed++;
+                }
+                int effectiveWounds = Math.max(0, totalWounds - tqSuppressed);
+                int amp = Math.max(0, Math.min(4, effectiveWounds - 1));
+                if (effectiveWounds > 0) {
                     player.addStatusEffect(new StatusEffectInstance(ModStatusEffects.BLEEDING_EFFECT, 40, amp, false, true, true));
                 } else {
                     player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);

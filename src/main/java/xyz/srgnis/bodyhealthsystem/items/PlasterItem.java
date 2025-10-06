@@ -162,8 +162,20 @@ public class PlasterItem extends Item {
 
             if (target instanceof BodyProvider) {
                 Body body = ((BodyProvider) target).getBody();
-                BodyPart best = findBestPlasterTarget(body);
 
+                // First, remove one small wound if present anywhere (priority before HP heal)
+                BodyPart smallWoundPart = null;
+                for (BodyPart p : body.getParts()) {
+                    try { if (p.getSmallWounds() > 0) { smallWoundPart = p; break; } } catch (Throwable ignored) {}
+                }
+                if (smallWoundPart != null) {
+                    if (smallWoundPart.removeSmallWound()) {
+                        consumed = true;
+                    }
+                }
+
+                // Then proceed with original heal logic
+                BodyPart best = findBestPlasterTarget(body);
                 if (best != null) {
                     float healValue = HEAL_AMOUNT;
                     if (target.hasStatusEffect(ModStatusEffects.DRESSING_EFFECT)) {
@@ -178,10 +190,13 @@ public class PlasterItem extends Item {
                     }
                     float healed = best.getHealth() - before;
                     if (healed > 0f) {
-                        stack.decrement(1);
-                        world.playSound(null, target.getBlockPos(), SoundEvents.BLOCK_WOOL_PLACE, SoundCategory.PLAYERS, 1.0f, 1.0f);
                         consumed = true;
                     }
+                }
+
+                if (consumed) {
+                    stack.decrement(1);
+                    world.playSound(null, target.getBlockPos(), SoundEvents.BLOCK_WOOL_PLACE, SoundCategory.PLAYERS, 1.0f, 1.0f);
                 }
             }
 
