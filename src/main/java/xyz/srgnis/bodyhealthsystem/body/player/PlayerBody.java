@@ -131,23 +131,39 @@ public class PlayerBody extends Body {
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) return;
         if (suppressWoundEvaluation || part == null) return;
         if (entity.getWorld().isClient) return;
+
+        // Multiplier tweaks for specific parts (feet bleed a bit less)
         double multiplier = 1.0;
         var id = part.getIdentifier();
         if (id.equals(LEFT_FOOT) || id.equals(RIGHT_FOOT)) multiplier = 0.75;
+
+        // Normalize health into 0..1 where 0 = full HP, 1 = near-dead (<= 1 HP)
         float hp = Math.max(0.0f, part.getHealth());
         float nearDeadHP = 1.0f;
         float max = Math.max(nearDeadHP, part.getMaxHealth());
-        float t = 1.0f - Math.min(1.0f, (hp - nearDeadHP) / Math.max(0.0001f, (max - nearDeadHP)));
-        double smallBase = 0.35 + (0.80 - 0.35) * t;
-        double largeBase = 0.15 + (0.65 - 0.15) * t;
-        smallBase *= multiplier;
-        largeBase *= multiplier;
+        float denom = Math.max(0.0001f, (max - nearDeadHP));
+        float norm = Math.max(0.0f, Math.min(1.0f, (hp - nearDeadHP) / denom)); // 0 near-dead..1 full
+        float t = 1.0f - norm; // 0 at full, 1 near-dead
+
+        // New model:
+        // - Small wound chance: 10% -> 60% as t goes 0->1
+        // - If small succeeds, upgrade to large with: 5% -> 40% as t goes 0->1
+        double pSmall = (0.10 + 0.50 * t) * multiplier; // 0.10..0.60
+        double pUpgradeToLarge = (0.05 + 0.35 * t) * multiplier; // 0.05..0.40
+        pSmall = Math.max(0.0, Math.min(1.0, pSmall));
+        pUpgradeToLarge = Math.max(0.0, Math.min(1.0, pUpgradeToLarge));
+
         var rnd = entity.getRandom();
-        if (part.hasWoundCapacity() && rnd.nextDouble() < largeBase) {
-            part.addLargeWound();
-        }
-        if (part.hasWoundCapacity() && rnd.nextDouble() < smallBase) {
-            part.addSmallWound();
+        if (part.hasWoundCapacity() && rnd.nextDouble() < pSmall) {
+            // Apply small wound first
+            if (part.addSmallWound()) {
+                // Roll upgrade to large
+                if (part.hasWoundCapacity() || part.getSmallWounds() > 0) { // capacity 1: upgrade allowed when small present
+                    if (rnd.nextDouble() < pUpgradeToLarge) {
+                        part.addLargeWound(); // will internally convert small->large
+                    }
+                }
+            }
         }
     }
 
