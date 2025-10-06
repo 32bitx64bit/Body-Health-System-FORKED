@@ -356,21 +356,37 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                             float nScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
                             if (s > 0 || l > 0) list.add(Text.literal("Wounds: S"+s+"/L"+l));
                             if (tq) {
-                                // Show countdowns: 7min safe, then 4min necrosis; tourniquetTicks is cumulative across toggles
+                                // Show countdowns by part type:
+                                // - Head: 15s to necrosis, then 15s to death
+                                // - Others: 7min safe, then 4min necrosis
                                 int total = tqTicks / 20;
-                                if (necState == 0) {
-                                    // Clamp to [0, 7*60]
-                                    int totalClamped = Math.max(0, Math.min(7*60, total));
-                                    int remaining = 7*60 - totalClamped;
-                                    list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (safe)"));
-                                } else if (necState == 1) {
-                                    // Clamp necrosis elapsed to [0, 4*60]
-                                    int necElapsed = Math.max(0, total - 7*60);
-                                    necElapsed = Math.min(necElapsed, 4*60);
-                                    int necRemaining = 4*60 - necElapsed;
-                                    list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (necrosis)"));
+                                boolean isHead = partId.equals(PlayerBodyParts.HEAD);
+                                if (isHead) {
+                                    if (necState == 0) {
+                                        int remaining = Math.max(0, 15 - total);
+                                        list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (to necrosis)"));
+                                    } else if (necState == 1) {
+                                        int necElapsed = Math.max(0, total - 15);
+                                        int necRemaining = Math.max(0, 15 - necElapsed);
+                                        list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (to death)"));
+                                    } else {
+                                        list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
+                                    }
                                 } else {
-                                    list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
+                                    if (necState == 0) {
+                                        // Clamp to [0, 7*60]
+                                        int totalClamped = Math.max(0, Math.min(7*60, total));
+                                        int remaining = 7*60 - totalClamped;
+                                        list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (safe)"));
+                                    } else if (necState == 1) {
+                                        // Clamp necrosis elapsed to [0, 4*60]
+                                        int necElapsed = Math.max(0, total - 7*60);
+                                        necElapsed = Math.min(necElapsed, 4*60);
+                                        int necRemaining = 4*60 - necElapsed;
+                                        list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (necrosis)"));
+                                    } else {
+                                        list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
+                                    }
                                 }
                             }
                             if (necState == 1) {
