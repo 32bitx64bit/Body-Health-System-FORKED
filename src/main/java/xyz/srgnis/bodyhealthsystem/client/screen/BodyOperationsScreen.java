@@ -360,7 +360,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                                 // - Head: 15s to necrosis, then 15s to death
                                 // - Others: 7min safe, then 4min necrosis
                                 int total = tqTicks / 20;
-                                boolean isHead = partId.equals(PlayerBodyParts.HEAD);
+                                boolean isHead = b.partId.equals(PlayerBodyParts.HEAD);
                                 if (isHead) {
                                     if (necState == 0) {
                                         int remaining = Math.max(0, 15 - total);
