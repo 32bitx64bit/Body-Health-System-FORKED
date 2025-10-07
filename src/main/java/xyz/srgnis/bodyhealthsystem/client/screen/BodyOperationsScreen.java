@@ -354,7 +354,8 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                             int tqTicks = (int) part.getClass().getMethod("getTourniquetTicks").invoke(part);
                             int necState = (int) part.getClass().getMethod("getNecrosisState").invoke(part);
                             float nScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
-                            if (s > 0 || l > 0) list.add(Text.literal("Wounds: S"+s+"/L"+l));
+                            if (l > 0) list.add(Text.literal("Large wound"));
+                            else if (s > 0) list.add(Text.literal("Small wound"));
                             if (tq) {
                                 // Show countdowns by part type:
                                 // - Head: 15s to necrosis, then 15s to death
