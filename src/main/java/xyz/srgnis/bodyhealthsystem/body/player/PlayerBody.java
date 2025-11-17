@@ -1,5 +1,7 @@
 package xyz.srgnis.bodyhealthsystem.body.player;
 
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.DamageUtil;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
@@ -89,6 +91,13 @@ public class PlayerBody extends Body {
 
     //Progressive application of the damage from foot to torso
     public void applyFallDamage(float amount, DamageSource source){
+        PlayerEntity player = (PlayerEntity) entity;
+        int featherLevel = EnchantmentHelper.getEquipmentLevel(Enchantments.FEATHER_FALLING, player);
+        if (featherLevel > 0) {
+            // Each Feather Falling level shaves 12% off the incoming fall damage before we split it between limbs.
+            float reductionMultiplier = Math.max(0.0f, 1.0f - (0.12f * featherLevel));
+            amount *= reductionMultiplier;
+        }
         amount = amount/2;
         float remaining;
         remaining = takeDamage(amount, source, this.getPart(RIGHT_FOOT));
