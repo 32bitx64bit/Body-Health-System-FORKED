@@ -50,7 +50,7 @@ public class PlayerBody extends Body {
         }
         //TODO: handle more damage sources
         //TODO: starvation overpowered?
-        if (source.isOf(DamageTypes.FALL) || source.isOf(DamageTypes.HOT_FLOOR)) {
+        if (source.isOf(DamageTypes.FALL) || source.isOf(DamageTypes.HOT_FLOOR) || source.isOf(DamageTypes.STALAGMITE)) {
             applyFallDamage(amount, source);
         } else if (source.isOf(DamageTypes.LIGHTNING_BOLT) || source.isOf(DamageTypes.LAVA) || source.isOf(DamageTypes.FIREBALL) || source.isOf(DamageTypes.EXPLOSION) || source.isOf(DamageTypes.PLAYER_EXPLOSION)) {
             applyDamageFullRandom(amount, source);
