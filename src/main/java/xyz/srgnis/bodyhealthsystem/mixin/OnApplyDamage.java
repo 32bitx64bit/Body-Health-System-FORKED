@@ -30,16 +30,6 @@ public class OnApplyDamage {
             body.applyDamageBySource(amount, source);
             body.updateHealth();
 
-            // If this hit would kill the player but head is still intact, enter downed and cancel vanilla subtraction
-            var head = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
-            float predicted = player.getHealth() - amount;
-            if (head != null && head.getHealth() > 0.0f && predicted <= 0.0f) {
-                body.startDowned();
-                player.setHealth(1.0f);
-                ServerNetworking.syncBody(player);
-                return 0.0f;
-            }
-
             // If player entered or is in downed state, prevent vanilla health subtraction this hit
             if (body.isDowned()) {
                 ServerNetworking.syncBody(player);
@@ -65,7 +55,7 @@ public class OnApplyDamage {
 
             ServerNetworking.syncBody(player);
         }
-        // Return the original amount to allow proper health reduction
-        return amount;
+        // Return 0 to prevent vanilla from applying damage again (since we already synced health via updateHealth)
+        return 0.0f;
     }
 }
