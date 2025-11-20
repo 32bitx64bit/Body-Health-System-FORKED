@@ -411,6 +411,15 @@ public class ServerNetworking {
                 body.onBoneTreatmentApplied();
                 didSomething = true;
             }
+            // Fix wounds (bleeding)
+            if (part.getSmallWounds() > 0) {
+                part.removeSmallWound();
+                didSomething = true;
+            }
+            if (part.getLargeWounds() > 0) {
+                part.removeLargeWound();
+                didSomething = true;
+            }
             // Heal some HP (consider boosted cap as baseline)
             float effMax = part.getMaxHealth() + Math.max(0.0f, body.getBoostForPart(partID));
             if (part.getHealth() < effMax) {
