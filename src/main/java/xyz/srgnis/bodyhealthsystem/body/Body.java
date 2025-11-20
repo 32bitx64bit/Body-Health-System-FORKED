@@ -558,9 +558,7 @@ public abstract class Body {
         if (torso != null && torso.getHealth() <= 0.0f) {
             startDowned();
             // Keep player barely alive while downed to allow revival
-            if (entity.getHealth() < 1.0f) {
-                entity.setHealth(1.0f);
-            }
+            entity.setHealth(1.0f);
             return;
         }
 

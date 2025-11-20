@@ -32,6 +32,10 @@ public class OnApplyDamage {
 
             // If player entered or is in downed state, prevent vanilla health subtraction this hit
             if (body.isDowned()) {
+                // Ensure health is strictly positive to prevent vanilla death logic
+                if (player.getHealth() <= 0.0f) {
+                    player.setHealth(1.0f);
+                }
                 ServerNetworking.syncBody(player);
                 return 0.0f;
             }
