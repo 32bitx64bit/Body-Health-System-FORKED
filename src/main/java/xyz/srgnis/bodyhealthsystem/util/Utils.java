@@ -36,8 +36,9 @@ public class Utils {
     }
 
     public static <T> List<T> random_sublist(List<T> list, int newSize){
-        Collections.shuffle(list);
-        return list.subList(0, newSize);
+        List<T> copy = new ArrayList<>(list);
+        Collections.shuffle(copy);
+        return copy.subList(0, newSize);
     }
 
     public static float modifyProtection(ArmorItem armorItem, int slot){

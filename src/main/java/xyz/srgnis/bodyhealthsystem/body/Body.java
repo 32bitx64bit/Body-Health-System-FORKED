@@ -82,6 +82,15 @@ public abstract class Body {
         return new ArrayList<>(noCriticalParts.keySet());
     }
 
+    // Performance optimization: direct collection access for read-only iteration
+    // These avoid creating new ArrayList objects on each call
+    public java.util.Collection<BodyPart> getPartsView(){
+        return parts.values();
+    }
+    public java.util.Collection<BodyPart> getNoCriticalPartsView(){
+        return noCriticalParts.values();
+    }
+
     public void writeToNbt (NbtCompound nbt){
         NbtCompound new_nbt = new NbtCompound();
         for(BodyPart part : getParts()){
@@ -323,7 +332,8 @@ public abstract class Body {
         // Determine impairment: either bone broken OR limb destroyed (HP <= 0) counts as impaired
         int impairedArms = 0;
         int impairedLegsFeet = 0;
-        for (BodyPart p : getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : getPartsView()) {
             var id = p.getIdentifier();
             if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             boolean impaired = p.isBroken() || p.getHealth() <= 0.0f;
@@ -365,7 +375,8 @@ public abstract class Body {
         // Tick per-bone timers and apply new Broken Bone status effect 15s after break
         int totalBroken = 0;
         boolean boneStateChanged = false;
-        for (BodyPart p : getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : getPartsView()) {
             if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             if (p.isBroken()) {
                 p.tickBroken();
@@ -387,7 +398,8 @@ public abstract class Body {
             int stacks = Math.min(3, totalBroken);
             // Only kick in after 15s since the first broken bone (use min brokenTicks across parts)
             int maxBrokenTicks = 0;
-            for (BodyPart p : getParts()) {
+            // Optimized: use view to avoid ArrayList creation
+            for (BodyPart p : getPartsView()) {
                 if (!p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && p.isBroken()) {
                     maxBrokenTicks = Math.max(maxBrokenTicks, p.getBrokenTicks());
                 }
@@ -465,7 +477,8 @@ public abstract class Body {
         if (targetIsTorso) {
             // Route bleeding from torso to limbs first; only damage torso if no limbs remain or after limbs are exhausted
             java.util.List<BodyPart> limbs = new java.util.ArrayList<>();
-            for (BodyPart p : getParts()) {
+            // Optimized: use view to avoid ArrayList creation
+            for (BodyPart p : getPartsView()) {
                 if (p == torso) continue;
                 if (p == head) continue;
                 if (p.getHealth() <= 0.0f) continue;
@@ -502,7 +515,8 @@ public abstract class Body {
         // Choose spillover target: prefer non-head, non-torso limbs; only include torso if no other limbs available; head only as last resort
         java.util.List<BodyPart> limbCandidates = new java.util.ArrayList<>();
         java.util.List<BodyPart> torsoCandidate = new java.util.ArrayList<>();
-        for (BodyPart p : getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : getPartsView()) {
             if (p == target) continue;
             if (p.getHealth() <= 0.0f) continue;
             var id = p.getIdentifier();
@@ -565,7 +579,8 @@ public abstract class Body {
         // Normal proportional health mapping, with downed threshold fallback
         float max_effective = 0;
         float actual_health = 0;
-        for (BodyPart part : this.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart part : this.getPartsView()) {
             float boost = getBoostForPart(part.getIdentifier());
             max_effective += part.getMaxHealth() + Math.max(0.0f, boost);
             actual_health += part.getHealth();
@@ -598,7 +613,8 @@ public abstract class Body {
     }
 
     public void applyTotem(){
-        for( BodyPart part : this.getParts()){
+        // Optimized: use view to avoid ArrayList creation
+        for( BodyPart part : this.getPartsView()){
             if( part.getHealth() < 1.0F) part.setHealth(1.0F);
         }
         this.updateHealth();
@@ -711,7 +727,8 @@ public abstract class Body {
     public void applyRevival(int healPerPart, int bonesToFix) {
         if (!downed) return;
         // Heal all damaged body parts by healPerPart up to boosted effective cap
-        for (BodyPart p : getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : getPartsView()) {
             float boost = Math.max(0.0f, getBoostForPart(p.getIdentifier()));
             float effMax = p.getMaxHealth() + boost;
             if (p.getHealth() < effMax) {
@@ -739,7 +756,8 @@ public abstract class Body {
         }
         if (count <= 0) return;
         // Gather other broken bones except head
-        for (BodyPart p : getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : getPartsView()) {
             if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             if (p.isBroken()) candidates.add(p);
         }
@@ -755,7 +773,8 @@ public abstract class Body {
 
 
     protected boolean anyBoneBroken() {
-        for (BodyPart p : getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : getPartsView()) {
             if (!p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && p.isBroken()) {
                 return true;
             }
@@ -765,7 +784,8 @@ public abstract class Body {
 
     protected int brokenBonesCount() {
         int c = 0;
-        for (BodyPart p : getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : getPartsView()) {
             if (!p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD) && p.isBroken()) c++;
         }
         return c;

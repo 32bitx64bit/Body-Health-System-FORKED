@@ -58,18 +58,16 @@ public class PlayerTickMixin {
     @Unique
     private static java.util.List<BodyPart> pickColdTargets(Body body) {
         java.util.List<BodyPart> out = new java.util.ArrayList<>();
-        BodyPart la = body.getPart(PlayerBodyParts.LEFT_ARM);
-        BodyPart ra = body.getPart(PlayerBodyParts.RIGHT_ARM);
-        BodyPart ll = body.getPart(PlayerBodyParts.LEFT_LEG);
-        BodyPart rl = body.getPart(PlayerBodyParts.RIGHT_LEG);
-        BodyPart lf = body.getPart(PlayerBodyParts.LEFT_FOOT);
-        BodyPart rf = body.getPart(PlayerBodyParts.RIGHT_FOOT);
-        if (la != null && la.getHealth() > 0.0f) out.add(la);
-        if (ra != null && ra.getHealth() > 0.0f) out.add(ra);
-        if (ll != null && ll.getHealth() > 0.0f) out.add(ll);
-        if (rl != null && rl.getHealth() > 0.0f) out.add(rl);
-        if (lf != null && lf.getHealth() > 0.0f) out.add(lf);
-        if (rf != null && rf.getHealth() > 0.0f) out.add(rf);
+        // Optimized: iterate once instead of 6 getPart calls
+        for (BodyPart p : body.getPartsView()) {
+            if (p.getHealth() <= 0.0f) continue;
+            var id = p.getIdentifier();
+            if (id.equals(PlayerBodyParts.LEFT_ARM) || id.equals(PlayerBodyParts.RIGHT_ARM) ||
+                id.equals(PlayerBodyParts.LEFT_LEG) || id.equals(PlayerBodyParts.RIGHT_LEG) ||
+                id.equals(PlayerBodyParts.LEFT_FOOT) || id.equals(PlayerBodyParts.RIGHT_FOOT)) {
+                out.add(p);
+            }
+        }
         return out;
     }
 
@@ -125,8 +123,8 @@ public class PlayerTickMixin {
             boolean hasTqOrNec = false;
             boolean woundsEnabled = Config.enableWoundingSystem;
             int totalWounds = 0;
-            // Iterate parts
-            for (BodyPart p : body.getParts()) {
+            // Iterate parts - using optimized view to avoid ArrayList creation
+            for (BodyPart p : body.getPartsView()) {
                 // Tick tourniquet timer
                 if (woundsEnabled) p.tickTourniquet();
 
@@ -218,7 +216,7 @@ public class PlayerTickMixin {
                 // Visual indicator only: Bleeding effect with amplifier 0..4 (represents 1..5)
                 // Reduce severity for parts with tourniquets (they pause bleed); approximate by subtracting count of tourniqueted wounded parts.
                 int tqSuppressed = 0;
-                for (BodyPart p : body.getParts()) {
+                for (BodyPart p : body.getPartsView()) {
                     if ((p.getSmallWounds() + p.getLargeWounds()) > 0 && p.hasTourniquet()) tqSuppressed++;
                 }
                 int effectiveWounds = Math.max(0, totalWounds - tqSuppressed);
@@ -358,13 +356,14 @@ public class PlayerTickMixin {
                 if (bhs$heatTickCounter >= 40) {
                     bhs$heatTickCounter = 0;
                     java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
-                    for (BodyPart p : body.getNoCriticalParts()) {
+                    // Optimized: use view methods to avoid ArrayList creation
+                    for (BodyPart p : body.getNoCriticalPartsView()) {
                         if (p.getHealth() > 0.0f && !p.getIdentifier().equals(PlayerBodyParts.HEAD)) {
                             candidates.add(p);
                         }
                     }
                     if (candidates.isEmpty()) {
-                        for (BodyPart p : body.getParts()) {
+                        for (BodyPart p : body.getPartsView()) {
                             if (p.getHealth() > 0.0f && !p.getIdentifier().equals(PlayerBodyParts.HEAD)) {
                                 candidates.add(p);
                             }

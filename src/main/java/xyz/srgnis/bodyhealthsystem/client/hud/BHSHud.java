@@ -49,7 +49,8 @@ public class BHSHud implements HudRenderCallback {
         // Optional: draw only when damaged or broken
         if (Config.hudOnlyWhenDamaged) {
             boolean anyDamaged = false;
-            for (var p : body.getParts()) {
+            // Optimized: use view to avoid ArrayList creation
+            for (var p : body.getPartsView()) {
                 if (p.isDamaged() || p.isBroken()) { anyDamaged = true; break; }
             }
             if (!anyDamaged) return;
@@ -62,28 +63,38 @@ public class BHSHud implements HudRenderCallback {
         drawContext.getMatrices().translate(0, 0, -1);
         drawContext.getMatrices().scale(Config.hudScale, Config.hudScale, 1);
 
+        // Optimized: cache body part references to avoid 8 HashMap lookups
+        var head = body.getPart(PlayerBodyParts.HEAD);
+        var leftArm = body.getPart(PlayerBodyParts.LEFT_ARM);
+        var rightArm = body.getPart(PlayerBodyParts.RIGHT_ARM);
+        var torso = body.getPart(PlayerBodyParts.TORSO);
+        var leftLeg = body.getPart(PlayerBodyParts.LEFT_LEG);
+        var rightLeg = body.getPart(PlayerBodyParts.RIGHT_LEG);
+        var leftFoot = body.getPart(PlayerBodyParts.LEFT_FOOT);
+        var rightFoot = body.getPart(PlayerBodyParts.RIGHT_FOOT);
+
         int color;
         // head
-        color = selectHealthColor(body.getPart(PlayerBodyParts.HEAD));
+        color = selectHealthColor(head);
         drawHealthRectangle(drawContext, startX + GUIConstants.HEAD_X_OFFSET, startY + GUIConstants.HEAD_Y_OFFSET, GUIConstants.HEAD_WIDTH, GUIConstants.HEAD_HEIGHT, color);
         // left arm
-        color = selectHealthColor(body.getPart(PlayerBodyParts.LEFT_ARM));
+        color = selectHealthColor(leftArm);
         drawHealthRectangle(drawContext, startX + GUIConstants.LEFT_ARM_X_OFFSET, startY + GUIConstants.LEFT_ARM_Y_OFFSET, GUIConstants.LEFT_ARM_WIDTH, GUIConstants.LEFT_ARM_HEIGHT, color);
         // torso
-        color = selectHealthColor(body.getPart(PlayerBodyParts.TORSO));
+        color = selectHealthColor(torso);
         drawHealthRectangle(drawContext, startX + GUIConstants.TORSO_X_OFFSET, startY + GUIConstants.TORSO_Y_OFFSET, GUIConstants.TORSO_WIDTH, GUIConstants.TORSO_HEIGHT, color);
         // right arm
-        color = selectHealthColor(body.getPart(PlayerBodyParts.RIGHT_ARM));
+        color = selectHealthColor(rightArm);
         drawHealthRectangle(drawContext, startX + GUIConstants.RIGHT_ARM_X_OFFSET, startY + GUIConstants.RIGHT_ARM_Y_OFFSET, GUIConstants.RIGHT_ARM_WIDTH, GUIConstants.RIGHT_ARM_HEIGHT, color);
         // legs
-        color = selectHealthColor(body.getPart(PlayerBodyParts.LEFT_LEG));
+        color = selectHealthColor(leftLeg);
         drawHealthRectangle(drawContext, startX + GUIConstants.LEFT_LEG_X_OFFSET, startY + GUIConstants.LEFT_LEG_Y_OFFSET, GUIConstants.LEFT_LEG_WIDTH, GUIConstants.LEFT_LEG_HEIGHT, color);
-        color = selectHealthColor(body.getPart(PlayerBodyParts.RIGHT_LEG));
+        color = selectHealthColor(rightLeg);
         drawHealthRectangle(drawContext, startX + GUIConstants.RIGHT_LEG_X_OFFSET, startY + GUIConstants.RIGHT_LEG_Y_OFFSET, GUIConstants.RIGHT_LEG_WIDTH, GUIConstants.RIGHT_LEG_HEIGHT, color);
         // feet
-        color = selectHealthColor(body.getPart(PlayerBodyParts.LEFT_FOOT));
+        color = selectHealthColor(leftFoot);
         drawHealthRectangle(drawContext, startX + GUIConstants.LEFT_FOOT_X_OFFSET, startY + GUIConstants.LEFT_FOOT_Y_OFFSET, GUIConstants.LEFT_FOOT_WIDTH, GUIConstants.LEFT_FOOT_HEIGHT, color);
-        color = selectHealthColor(body.getPart(PlayerBodyParts.RIGHT_FOOT));
+        color = selectHealthColor(rightFoot);
         drawHealthRectangle(drawContext, startX + GUIConstants.RIGHT_FOOT_X_OFFSET, startY + GUIConstants.RIGHT_FOOT_Y_OFFSET, GUIConstants.RIGHT_FOOT_WIDTH, GUIConstants.RIGHT_FOOT_HEIGHT, color);
 
         drawContext.getMatrices().pop();
