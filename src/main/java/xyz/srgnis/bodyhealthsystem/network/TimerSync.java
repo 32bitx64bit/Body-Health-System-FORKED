@@ -16,7 +16,8 @@ public final class TimerSync {
     public static void sendSelf(ServerPlayerEntity spe) {
         var body = ((BodyProvider) spe).getBody();
         PacketByteBuf buf = PacketByteBufs.create();
-        for (BodyPart p : body.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : body.getPartsView()) {
             buf.writeIdentifier(p.getIdentifier());
             buf.writeInt(p.getTourniquetTicks());
             buf.writeInt(p.getNecrosisState());

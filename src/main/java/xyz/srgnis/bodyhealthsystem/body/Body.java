@@ -93,7 +93,8 @@ public abstract class Body {
 
     public void writeToNbt (NbtCompound nbt){
         NbtCompound new_nbt = new NbtCompound();
-        for(BodyPart part : getParts()){
+        // Optimized: use view to avoid ArrayList creation
+        for(BodyPart part : getPartsView()){
             part.writeToNbt(new_nbt);
         }
         // Persist downed-related state so behavior continues after relog
@@ -139,7 +140,8 @@ public abstract class Body {
     }
 
     public void healAll(){
-        for(BodyPart part : getParts()){
+        // Optimized: use view to avoid ArrayList creation
+        for(BodyPart part : getPartsView()){
             part.heal();
         }
     }

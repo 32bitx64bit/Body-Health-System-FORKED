@@ -29,7 +29,8 @@ class BodyBuckets {
     void ensureAbsorptionBucketsUpToDate() {
         // Reclaim buckets from dead parts
         float reclaim = 0.0f;
-        for (BodyPart p : body.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : body.getPartsView()) {
             if (p.getHealth() <= 0.0f) {
                 Identifier id = p.getIdentifier();
                 float b = absorptionBuckets.getOrDefault(id, 0.0f);
@@ -77,7 +78,8 @@ class BodyBuckets {
             }
         }
         List<BodyPart> alive = new ArrayList<>();
-        for (BodyPart p : body.getParts()) if (p.getHealth() > 0.0f) alive.add(p);
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : body.getPartsView()) if (p.getHealth() > 0.0f) alive.add(p);
         if (amount > 0.0f && !alive.isEmpty()) {
             float share = amount / (float) alive.size();
             for (BodyPart p : alive) {
@@ -104,7 +106,8 @@ class BodyBuckets {
     void ensureBoostBucketsUpToDate() {
         // Reclaim from dead parts
         float reclaim = 0.0f;
-        for (BodyPart p : body.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : body.getPartsView()) {
             if (p.getHealth() <= 0.0f) {
                 Identifier id = p.getIdentifier();
                 float b = boostBuckets.getOrDefault(id, 0.0f);
@@ -131,7 +134,8 @@ class BodyBuckets {
     }
 
     private void clampAllPartsToEffectiveCap() {
-        for (BodyPart p : body.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : body.getPartsView()) {
             float boost = getBoostForPart(p.getIdentifier());
             float cap = p.getMaxHealth() + Math.max(0.0f, boost);
             if (p.getHealth() > cap) p.setHealth(cap);
@@ -161,7 +165,8 @@ class BodyBuckets {
             }
         }
         List<BodyPart> alive = new ArrayList<>();
-        for (BodyPart p : body.getParts()) if (p.getHealth() > 0.0f) alive.add(p);
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : body.getPartsView()) if (p.getHealth() > 0.0f) alive.add(p);
         if (amount > 0.0f && !alive.isEmpty()) {
             float share = amount / (float) alive.size();
             for (BodyPart p : alive) {

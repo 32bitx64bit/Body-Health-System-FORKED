@@ -31,7 +31,8 @@ public abstract class SleepHealMixin {
         if (healPercent > 0.0f) {
             // Compute total effective max health
             float totalMax = 0.0f;
-            for (BodyPart p : body.getParts()) {
+            // Optimized: use view to avoid ArrayList creation
+            for (BodyPart p : body.getPartsView()) {
                 float boost = Math.max(0.0f, body.getBoostForPart(p.getIdentifier()));
                 totalMax += p.getMaxHealth() + boost;
             }
@@ -49,7 +50,8 @@ public abstract class SleepHealMixin {
             Random rng = self.getRandom();
 
             ArrayList<BodyPart> broken = new ArrayList<>();
-            for (BodyPart p : body.getParts()) {
+            // Optimized: use view to avoid ArrayList creation
+            for (BodyPart p : body.getPartsView()) {
                 // Skip head bone entirely
                 if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
                 if (p.isBroken()) broken.add(p);
@@ -73,7 +75,8 @@ public abstract class SleepHealMixin {
         }
 
         // Also clear any lingering procedure debuff and necrosis recovery on sleep
-        for (BodyPart p : body.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart p : body.getPartsView()) {
             try {
                 // Clear stitches temporary debuff
                 p.getClass().getMethod("clearProcedureDebuff").invoke(p);

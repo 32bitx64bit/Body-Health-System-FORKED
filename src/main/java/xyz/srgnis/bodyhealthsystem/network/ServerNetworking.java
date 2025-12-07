@@ -182,7 +182,8 @@ public class ServerNetworking {
 
         var body = ((BodyProvider)entity).getBody();
         body.prepareBucketSync();
-        for (BodyPart part : body.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart part : body.getPartsView()) {
             Identifier idf = part.getIdentifier();
             buf.writeIdentifier(idf);
             buf.writeFloat(part.getHealth());
@@ -235,7 +236,8 @@ public class ServerNetworking {
         PacketByteBuf buf = PacketByteBufs.create();
         var body = ((BodyProvider) self).getBody();
         body.prepareBucketSync();
-        for (BodyPart part : body.getParts()) {
+        // Optimized: use view to avoid ArrayList creation
+        for (BodyPart part : body.getPartsView()) {
             Identifier idf = part.getIdentifier();
             buf.writeIdentifier(idf);
             buf.writeFloat(part.getHealth());
@@ -295,12 +297,14 @@ public class ServerNetworking {
             if (!removed) {
                 // If all limbs at max health, remove from a random limb that has a small wound
                 boolean allMax = true;
-                for (BodyPart p : body.getParts()) {
+                // Optimized: use view to avoid ArrayList creation
+                for (BodyPart p : body.getPartsView()) {
                     if (p.getHealth() < p.getMaxHealth()) { allMax = false; break; }
                 }
                 if (allMax) {
                     java.util.List<BodyPart> candidates = new java.util.ArrayList<>();
-                    for (BodyPart p : body.getParts()) {
+                    // Optimized: use view to avoid ArrayList creation
+                    for (BodyPart p : body.getPartsView()) {
                         try { if ((int) p.getClass().getMethod("getSmallWounds").invoke(p) > 0) candidates.add(p); } catch (Throwable ignored) {}
                     }
                     if (!candidates.isEmpty()) {
