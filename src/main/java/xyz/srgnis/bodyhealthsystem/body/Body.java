@@ -598,6 +598,7 @@ public abstract class Body {
     }
 
     public void applyTotem(){
+        clearDowned();
         for( BodyPart part : this.getParts()){
             if( part.getHealth() < 1.0F) part.setHealth(1.0F);
         }

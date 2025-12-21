@@ -28,6 +28,27 @@ public class OnApplyDamage {
             PlayerEntity player = (PlayerEntity)(Object)this;
             Body body = ((BodyProvider)this).getBody();
             body.applyDamageBySource(amount, source);
+
+            // Totems should trigger if the head OR torso would be destroyed.
+            // Vanilla totems are normally based on heart HP reaching 0; since we manage HP ourselves,
+            // we invoke the vanilla totem path here when a critical part is destroyed.
+            if (!player.getWorld().isClient) {
+                var head = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
+                var torso = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+                boolean criticalDestroyed = (head != null && head.getHealth() <= 0.0f)
+                        || (torso != null && torso.getHealth() <= 0.0f);
+                if (criticalDestroyed) {
+                    try {
+                        boolean used = ((TryUseTotemInvoker) player).invokeTryUseTotem(source);
+                        if (used) {
+                            ServerNetworking.syncBody(player);
+                            return 0.0f;
+                        }
+                    } catch (Throwable ignored) {
+                        // If the invoker fails for any reason, fall back to normal behavior.
+                    }
+                }
+            }
             body.updateHealth();
 
             // If player entered or is in downed state, prevent vanilla health subtraction this hit
