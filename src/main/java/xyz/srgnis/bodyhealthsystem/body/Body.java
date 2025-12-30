@@ -694,17 +694,15 @@ public abstract class Body {
     public void tickDowned() {
         if (!downed) return;
         if (entity.getWorld().isClient) return;
+        if (pendingDeath) return;
         if (!beingRevived) {
             if (bleedOutTicksRemaining > 0) {
                 bleedOutTicksRemaining--;
             }
             if (bleedOutTicksRemaining <= 0) {
                 // Bleed out - ensure a proper vanilla death path that supports respawn
-                if (entity.isAlive()) {
-                    pendingDeath = true;
-                    entity.damage(entity.getDamageSources().outOfWorld(), 1000.0f);
-                }
-                clearDowned();
+                pendingDeath = true;
+                beingRevived = false;
             }
         }
     }
