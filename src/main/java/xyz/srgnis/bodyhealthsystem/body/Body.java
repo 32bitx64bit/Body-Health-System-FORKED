@@ -550,7 +550,14 @@ public abstract class Body {
         BodyPart head = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
         BodyPart torso = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
         if (head != null && head.getHealth() <= 0.0f) {
-            entity.setHealth(0);
+            // Do NOT set health to 0 directly: that can bypass the normal vanilla death pipeline
+            // (including inventory drops) because it may not be associated with a DamageSource.
+            // Instead, request a vanilla death and let PlayerTickMixin apply the kill damage.
+            if (!entity.getWorld().isClient) {
+                pendingDeath = true;
+            } else {
+                entity.setHealth(0);
+            }
             return;
         }
 
