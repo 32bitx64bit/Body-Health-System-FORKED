@@ -24,6 +24,11 @@ public abstract class SleepHealMixin {
         if (self.getWorld().isClient()) return;
         if (!(self instanceof ServerPlayerEntity spe)) return;
 
+        // Only apply "sleep" healing after a successful sleep (i.e., when the game finishes sleeping)
+        // Not when the player exits the bed early.
+        if (skipSleepTimer) return;
+        if (!self.getWorld().isDay()) return;
+
         Body body = ((BodyProvider) self).getBody();
         if (body == null) return;
 
