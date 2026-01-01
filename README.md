@@ -18,7 +18,7 @@ Arrow raycast hit detection.
 Bug fixes.
 
 ## Crafting
-Use JEI 
+Use JEI for now, wiki soon?
 https://modrinth.com/mod/jei
 
 
@@ -32,4 +32,10 @@ And thanks to @SrGnis for making the original mod.
 
 Add a wiki.
 
-Add items for the new temperature API, Armors, blocks (Like air conditioning), etc to help players resist the cold / heat before the 0.5 release.
+### Versioning information 
+
+0.0.0
+First number : whenever second gets to big, or a massive update that warrants it.
+Second number : Major version with tons of changes
+Third number : A minor version with small additions and or bug fixes.
+
