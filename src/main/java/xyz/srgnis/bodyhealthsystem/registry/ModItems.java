@@ -24,6 +24,7 @@ import xyz.srgnis.bodyhealthsystem.items.ThermometerItem;
 import xyz.srgnis.bodyhealthsystem.items.PortableFanItem;
 import xyz.srgnis.bodyhealthsystem.items.StitchesItem;
 import xyz.srgnis.bodyhealthsystem.items.TourniquetItem;
+import xyz.srgnis.bodyhealthsystem.items.HerbalPoulticesItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -43,6 +44,8 @@ public class ModItems {
     public static final Item STRAW_HAT = new StrawHatItem(new FabricItemSettings());
     public static final Item STITCHES = new StitchesItem(new FabricItemSettings());
     public static final Item TOURNIQUET = new TourniquetItem(new FabricItemSettings());
+
+    public static final Item HERBAL_POULTICES = new HerbalPoulticesItem(new FabricItemSettings());
 
     public static final Item COOLING_GEL = new CoolingGelItem(new FabricItemSettings().maxCount(16));
     public static final Item HEATING_GEL = new HeatingGelItem(new FabricItemSettings().maxCount(16));
@@ -70,6 +73,7 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"portable_fan"), PORTABLE_FAN);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "stitches"), STITCHES);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "tourniquet"), TOURNIQUET);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID, "herbal_poultices"), HERBAL_POULTICES);
         ModItemsHolder.setStitches(STITCHES);
         ModItemsHolder.setTourniquet(TOURNIQUET);
 
@@ -112,6 +116,7 @@ public class ModItems {
             content.add(PORTABLE_FAN);
             content.add(STITCHES);
             content.add(TOURNIQUET);
+            content.add(HERBAL_POULTICES);
         });
     }
 }

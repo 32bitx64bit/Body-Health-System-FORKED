@@ -12,6 +12,7 @@
   "item.bodyhealthsystem.cooling_gel": "Cooling Gel",
   "item.bodyhealthsystem.heating_gel": "Heating Gel",
   "item.bodyhealthsystem.portable_fan": "Portable Fan",
+  "item.bodyhealthsystem.herbal_poultices": "Herbal Poultices",
 
   "itemGroup.bodyhealthsystem.general": "Body Health System",
 
@@ -23,6 +24,7 @@
   "effect.bodyhealthsystem.modhypo": "Hypothermia (Moderate)",
   "effect.bodyhealthsystem.servhypo": "Hypothermia (Severe)",
   "effect.bodyhealthsystem.broken_bone": "Broken Bone",
+  "effect.bodyhealthsystem.herbal_poultice_effect": "Herbal Poultices",
 
   "bodyhealthsystem.midnightconfig.title": "Body Health System",
 

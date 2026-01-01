@@ -124,6 +124,10 @@ public class PlayerTickMixin {
             boolean anyBleed = false;
             boolean hasTqOrNec = false;
             boolean woundsEnabled = Config.enableWoundingSystem;
+            boolean poulticeActive = player.hasStatusEffect(ModStatusEffects.HERBAL_POULTICE_EFFECT);
+            int smallBleedThreshold = 15 * 20 * (poulticeActive ? 2 : 1);
+            int largeBleedThreshold = 150 * (poulticeActive ? 2 : 1);
+            var rng = player.getRandom();
             int totalWounds = 0;
             // Iterate parts
             for (BodyPart p : body.getParts()) {
@@ -198,13 +202,39 @@ public class PlayerTickMixin {
                         int tS = p.getWoundBleedTicks();
                         int tL = p.getWoundBleedTicksLarge();
                         float dmg = 0.0f;
-                        if (tS >= 15*20 && s > 0) {
+                        boolean bledThisCycle = false;
+                        if (tS >= smallBleedThreshold && s > 0) {
                             dmg += s * 1.0f;
                             p.resetWoundBleedTicks();
+                            bledThisCycle = true;
                         }
-                        if (tL >= 150 && l > 0) { // 7.5 seconds = 150 ticks
+                        if (tL >= largeBleedThreshold && l > 0) { // base 7.5 seconds = 150 ticks
                             dmg += l * 1.0f;
                             p.resetWoundBleedTicksLarge();
+                            bledThisCycle = true;
+                        }
+
+                        // Herbal Poultices: on each bleed cycle, chance to heal/downgrade wounds.
+                        if (poulticeActive && bledThisCycle) {
+                            boolean improved = false;
+                            if (p.getSmallWounds() > 0) {
+                                if (rng.nextFloat() < 0.40f) {
+                                    improved = p.removeSmallWound();
+                                }
+                            } else if (p.getLargeWounds() > 0) {
+                                if (rng.nextFloat() < 0.15f) {
+                                    if (p.removeLargeWound()) {
+                                        p.addSmallWound();
+                                        improved = true;
+                                    }
+                                }
+                            }
+                            if (improved) {
+                                player.removeStatusEffect(ModStatusEffects.HERBAL_POULTICE_EFFECT);
+                                poulticeActive = false;
+                                smallBleedThreshold = 15 * 20;
+                                largeBleedThreshold = 150;
+                            }
                         }
                         if (dmg > 0.0f) {
                             ((Body) body).applyBleedingWithSpill(dmg, p);

@@ -11,6 +11,7 @@ import xyz.srgnis.bodyhealthsystem.effects.DressingStatusEffect;
 import xyz.srgnis.bodyhealthsystem.effects.BleedingStatusEffect;
 import xyz.srgnis.bodyhealthsystem.effects.ConditionStatusEffect;
 import xyz.srgnis.bodyhealthsystem.effects.BrokenBoneStatusEffect;
+import xyz.srgnis.bodyhealthsystem.effects.HerbalPoulticeStatusEffect;
 
 public class ModStatusEffects {
     public static final StatusEffect MORPHINE_EFFECT = new MorphineStatusEffect();
@@ -18,6 +19,7 @@ public class ModStatusEffects {
     public static final StatusEffect DRESSING_EFFECT = new DressingStatusEffect();
     public static final StatusEffect BLEEDING_EFFECT = new BleedingStatusEffect();
     public static final StatusEffect BROKEN_BONE = new BrokenBoneStatusEffect();
+    public static final StatusEffect HERBAL_POULTICE_EFFECT = new HerbalPoulticeStatusEffect();
 
     // Temperature condition icons (IDs are chosen to match texture file names under textures/mob_effect/)
     public static final StatusEffect HEAT_STROKE_INIT = new ConditionStatusEffect();      // heatstrokeinit.png
@@ -33,6 +35,7 @@ public class ModStatusEffects {
         Registry.register(Registries.STATUS_EFFECT, new Identifier(BHSMain.MOD_ID, "dressing_effect"), DRESSING_EFFECT);
         Registry.register(Registries.STATUS_EFFECT, new Identifier(BHSMain.MOD_ID, "bleeding_effect"), BLEEDING_EFFECT);
         Registry.register(Registries.STATUS_EFFECT, new Identifier(BHSMain.MOD_ID, "broken_bone"), BROKEN_BONE);
+        Registry.register(Registries.STATUS_EFFECT, new Identifier(BHSMain.MOD_ID, "herbal_poultice_effect"), HERBAL_POULTICE_EFFECT);
 
         Registry.register(Registries.STATUS_EFFECT, new Identifier(BHSMain.MOD_ID, "heatstrokeinit"), HEAT_STROKE_INIT);
         Registry.register(Registries.STATUS_EFFECT, new Identifier(BHSMain.MOD_ID, "heatstrokemod"), HEAT_STROKE_MOD);
