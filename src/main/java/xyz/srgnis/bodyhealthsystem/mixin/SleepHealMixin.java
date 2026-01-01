@@ -77,6 +77,23 @@ public abstract class SleepHealMixin {
             }
         }
 
+        // Wound healing chance on successful sleep (if wounding system enabled)
+        if (Config.enableWoundingSystem) {
+            Random rng = self.getRandom();
+            for (BodyPart p : body.getParts()) {
+                // Cap is 1 total wound, but prioritize large-wound healing just in case.
+                if (p.getLargeWounds() > 0) {
+                    if (rng.nextFloat() < 0.35f) {
+                        p.removeLargeWound();
+                    }
+                } else if (p.getSmallWounds() > 0) {
+                    if (rng.nextFloat() < 0.75f) {
+                        p.removeSmallWound();
+                    }
+                }
+            }
+        }
+
         // Also clear any lingering procedure debuff and necrosis recovery on sleep
         for (BodyPart p : body.getParts()) {
             // Clear stitches temporary debuff
