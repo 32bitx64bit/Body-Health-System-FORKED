@@ -52,8 +52,13 @@ public class PlayerBody extends Body {
         //TODO: starvation overpowered?
         if (source.isOf(DamageTypes.FALL) || source.isOf(DamageTypes.HOT_FLOOR) || source.isOf(DamageTypes.STALAGMITE)) {
             applyFallDamage(amount, source);
-        } else if (source.isOf(DamageTypes.LIGHTNING_BOLT) || source.isOf(DamageTypes.LAVA) || source.isOf(DamageTypes.FIREBALL) || source.isOf(DamageTypes.EXPLOSION) || source.isOf(DamageTypes.PLAYER_EXPLOSION)) {
+        } else if (source.isOf(DamageTypes.LIGHTNING_BOLT) || source.isOf(DamageTypes.LAVA) || source.isOf(DamageTypes.EXPLOSION) || source.isOf(DamageTypes.PLAYER_EXPLOSION)) {
             applyDamageFullRandom(amount, source);
+        } else if (source.isOf(DamageTypes.FIREBALL)) {
+            applyDamageFullRandom(amount, source);
+            // Fireballs are projectile-like: allow wounds.
+            BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
+            if (bhs$canApplyWoundsFor(source, true)) applyWoundChances(p, true);
         } else if (source.isOf(DamageTypes.STARVE)) {
             applyDamageLocal(amount, source, this.getPart(TORSO));
         } else if (source.isOf(DamageTypes.DROWN)) {
@@ -73,20 +78,36 @@ public class PlayerBody extends Body {
                     }
                 }
                 applyDamageLocal(amount, source, part);
-                if (!entity.getWorld().isClient && xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(part, true);
+                if (bhs$canApplyWoundsFor(source, true)) applyWoundChances(part, true);
             } else {
                 BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
                 applyDamageLocal(amount, source, p);
-                if (!entity.getWorld().isClient && xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(p, true);
+                if (bhs$canApplyWoundsFor(source, true)) applyWoundChances(p, true);
             }
             // Clear after consumption to avoid stale data
             ProjectileHitTracker.clear((PlayerEntity) entity);
         } else {
             BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
             applyDamageLocal(amount, source, p);
-            if (!entity.getWorld().isClient && xyz.srgnis.bodyhealthsystem.config.Config.enableWoundingSystem) applyWoundChances(p, false);
+            if (bhs$canApplyWoundsFor(source, false)) applyWoundChances(p, false);
         }
 
+    }
+
+    private boolean bhs$canApplyWoundsFor(DamageSource source, boolean projectile) {
+        if (!Config.enableWoundingSystem) return false;
+        if (entity == null || entity.getWorld().isClient) return false;
+        if (source == null) return false;
+
+        // Projectile wounds are allowed, but only for sources that we already routed through the projectile branch.
+        if (projectile) return true;
+
+        // Melee wounds: only direct player/mob attacks.
+        return source.isOf(DamageTypes.PLAYER_ATTACK)
+                || source.isOf(DamageTypes.MOB_ATTACK)
+            || source.isOf(DamageTypes.MOB_ATTACK_NO_AGGRO)
+            // Environmental fire damage is allowed (but not poison/wither/etc)
+            || source.isOf(DamageTypes.IN_FIRE);
     }
 
     //Progressive application of the damage from foot to torso
