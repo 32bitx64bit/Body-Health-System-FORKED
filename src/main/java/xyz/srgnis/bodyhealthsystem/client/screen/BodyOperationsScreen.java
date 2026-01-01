@@ -513,48 +513,60 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         int color = showTemperature ? selectTemperatureColor(bodyTempC) : selectHealthColor(p);
         drawHealthRectangle(ctx, x, y, w, h, color);
 
-        // We draw bones first, then wounds on top (for better visibility). Skip bones in temperature mode.
-        if (showTemperature) return; // no bone overlay in temperature mode
-        if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) return;
-        if (!BONE_LAYER_ENABLED) return;
+        // Skip overlays in temperature mode.
+        if (showTemperature) return;
 
-        boolean broken = p.isBroken();
-        Identifier tex = selectBoneTexture(partId, broken);
-        if (isTextureAvailable(tex)) {
-            if (partId.equals(PlayerBodyParts.LEFT_ARM) || partId.equals(PlayerBodyParts.RIGHT_ARM)) {
-                int topH = h / 2;
-                int bottomH = h - topH;
-                if (broken) {
-                    Boolean topBroken = p.getBrokenTopHalf();
-                    if (topBroken == null) topBroken = Boolean.TRUE;
-                    Identifier brokenTex = TEX_BONEMAIN_BROKEN;
-                    Identifier normalTex = TEX_BONEMAIN;
-                    if (topBroken) {
-                        ctx.drawTexture(brokenTex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
-                        ctx.drawTexture(normalTex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
-                    } else {
-                        ctx.drawTexture(normalTex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
-                        ctx.drawTexture(brokenTex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
-                    }
-                } else {
-                    ctx.drawTexture(tex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
-                    ctx.drawTexture(tex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
-                }
-            } else {
-                ctx.drawTexture(tex, x, y, w, h, 0.0F, 0.0F, 16, 16, 16, 16);
-            }
-        }
-        // Draw wounds overlay after bones so wounds are always visible
-        drawWounds(ctx, partId, p, x, y, w, h);
-    }
-
-    private void drawWounds(DrawContext ctx, Identifier partId, BodyPart p, int x, int y, int w, int h) {
-        // query counts via reflection (keeps client independent)
+        // Read wound counts (reflection keeps client independent)
         int s = 0, l = 0;
         try {
             s = (int) p.getClass().getMethod("getSmallWounds").invoke(p);
             l = (int) p.getClass().getMethod("getLargeWounds").invoke(p);
         } catch (Throwable ignored) {}
+
+        boolean boneSystemEnabled = xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem;
+        boolean broken = boneSystemEnabled && p.isBroken();
+
+        // If bone overlay is enabled, render bones first.
+        if (boneSystemEnabled && BONE_LAYER_ENABLED) {
+            Identifier tex = selectBoneTexture(partId, broken);
+            if (isTextureAvailable(tex)) {
+                if (partId.equals(PlayerBodyParts.LEFT_ARM) || partId.equals(PlayerBodyParts.RIGHT_ARM)) {
+                    int topH = h / 2;
+                    int bottomH = h - topH;
+                    if (broken) {
+                        Boolean topBroken = p.getBrokenTopHalf();
+                        if (topBroken == null) topBroken = Boolean.TRUE;
+                        Identifier brokenTex = TEX_BONEMAIN_BROKEN;
+                        Identifier normalTex = TEX_BONEMAIN;
+                        if (topBroken) {
+                            ctx.drawTexture(brokenTex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
+                            ctx.drawTexture(normalTex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
+                        } else {
+                            ctx.drawTexture(normalTex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
+                            ctx.drawTexture(brokenTex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
+                        }
+                    } else {
+                        ctx.drawTexture(tex, x, y, w, topH, 0.0F, 0.0F, 16, 16, 16, 16);
+                        ctx.drawTexture(tex, x, y + topH, w, bottomH, 0.0F, 0.0F, 16, 16, 16, 16);
+                    }
+                } else {
+                    ctx.drawTexture(tex, x, y, w, h, 0.0F, 0.0F, 16, 16, 16, 16);
+                }
+            }
+        }
+
+        // Always render wound overlays (even when bone layer is disabled by medkit).
+        drawWounds(ctx, partId, x, y, w, h, s, l);
+        drawWoundCounts(ctx, x, y, w, h, s, l);
+
+        // If bone system is enabled but the bone layer is off, still indicate broken bones.
+        if (boneSystemEnabled && !BONE_LAYER_ENABLED && broken && !partId.equals(PlayerBodyParts.HEAD)) {
+            int icon = Math.max(8, Math.min(12, Math.round(10 * DRAW_SCALE)));
+            ctx.drawTexture(TEX_BONEMAIN_BROKEN, x + 1, y + 1, icon, icon, 0.0F, 0.0F, 16, 16, 16, 16);
+        }
+    }
+
+    private void drawWounds(DrawContext ctx, Identifier partId, int x, int y, int w, int h, int s, int l) {
         if (s <= 0 && l <= 0) return;
         // Scale texture rects to the target rect
         // Small wound source rect: (6,6)-(9,11) on 16x16
@@ -582,6 +594,17 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             // source: 7x10 region (x:5..11, y:3..12) inclusive => width=7, height=10
             ctx.drawTexture(TEX_WOUND_LARGE, dx, dy, dw, dh, 5.0F, 3.0F, 7, 10, 16, 16);
         }
+    }
+
+    private void drawWoundCounts(DrawContext ctx, int x, int y, int w, int h, int s, int l) {
+        if (s <= 0 && l <= 0) return;
+        String text;
+        if (s > 0 && l > 0) text = "S" + s + " L" + l;
+        else if (l > 0) text = "L" + l;
+        else text = "S" + s;
+        int tx = x + 2;
+        int ty = y + h - 10;
+        ctx.drawTextWithShadow(MinecraftClient.getInstance().textRenderer, text, tx, ty, 0xFFFFFF);
     }
 
     private boolean isDrawableResource(Identifier id) {
