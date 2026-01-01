@@ -417,30 +417,68 @@ public class ServerNetworking {
 
         if (isUpgraded) {
             boolean didSomething = false;
+
+            boolean hadBroken = part.isBroken();
+            boolean hadLargeWound = part.getLargeWounds() > 0;
+            boolean hadSmallWound = part.getSmallWounds() > 0;
+            boolean hadAnyWound = hadLargeWound || hadSmallWound;
+
+            boolean healedBroken = false;
+            boolean healedWound = false;
+
             // Fix bone if broken
-            if (part.isBroken()) {
+            if (hadBroken) {
                 part.setBroken(false);
                 part.setBrokenTopHalf(null);
                 part.setFractureLocked(false);
                 part.setHealth(Math.max(1.0f, part.getHealth()));
                 body.onBoneTreatmentApplied();
+                healedBroken = true;
                 didSomething = true;
             }
-            // Fix wounds (bleeding)
-            if (part.getSmallWounds() > 0) {
-                part.removeSmallWound();
-                didSomething = true;
+
+            // Fix wounds on selected part (prefer large)
+            if (hadLargeWound) {
+                if (part.removeLargeWound()) {
+                    healedWound = true;
+                    didSomething = true;
+                }
+            } else if (hadSmallWound) {
+                if (part.removeSmallWound()) {
+                    healedWound = true;
+                    didSomething = true;
+                }
             }
-            if (part.getLargeWounds() > 0) {
-                part.removeLargeWound();
-                didSomething = true;
-            }
-            // Heal some HP (consider boosted cap as baseline)
+
+            // HP healing rules:
+            // - No injuries -> heal to max
+            // - If both a broken bone AND wound were present -> heal both but provide 0 HP
+            // - Broken bone only -> +2 HP
+            // - Small wound healed -> +3 HP
+            // - Large wound healed -> +1.5 HP
             float effMax = part.getMaxHealth() + Math.max(0.0f, body.getBoostForPart(partID));
             if (part.getHealth() < effMax) {
-                body.healPart(4, partID);
-                didSomething = true;
+                float hp = 0.0f;
+                if (hadBroken && hadAnyWound) {
+                    hp = 0.0f;
+                } else if (hadBroken) {
+                    hp = 2.0f;
+                } else if (hadLargeWound) {
+                    hp = 1.5f;
+                } else if (hadSmallWound) {
+                    hp = 3.0f;
+                } else {
+                    // no wound/bone: fully heal this part
+                    part.setHealth(effMax);
+                    didSomething = true;
+                }
+
+                if (hp > 0.0f) {
+                    body.healPart(hp, part);
+                    didSomething = true;
+                }
             }
+
             if (didSomething) {
                 if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
                     serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
@@ -453,21 +491,49 @@ public class ServerNetworking {
             return;
         }
 
-        // Default medkit behaviour: heal only when damaged
-        if (isMedkit && part.isDamaged()) {
-            // Do not allow healing if fracture has locked (requires upgraded medkit)
-            if (part.isFractureLocked()) {
-                return;
+        // Medkit behaviour:
+        // - Heals small wounds
+        // - Downgrades large wounds -> small
+        // - If it treated a wound this use, HP heal is only 2 (instead of 4)
+        if (isMedkit) {
+            boolean didSomething = false;
+            boolean treatedWound = false;
+
+            // Wound treatment on selected part
+            if (part.getLargeWounds() > 0) {
+                if (part.removeLargeWound()) {
+                    part.addSmallWound();
+                    treatedWound = true;
+                    didSomething = true;
+                }
+            } else if (part.getSmallWounds() > 0) {
+                if (part.removeSmallWound()) {
+                    treatedWound = true;
+                    didSomething = true;
+                }
             }
-            body.healPart(4, partID);
-            // decrement from inventory (inline to avoid missing method)
-            if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
-                serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
-            }else{
-                int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+
+            // HP heal (do not heal bones)
+            // If fracture is locked, block the HP heal portion (requires upgraded medkit)
+            if (!part.isFractureLocked()) {
+                float effMax = part.getMaxHealth() + Math.max(0.0f, body.getBoostForPart(partID));
+                if (part.getHealth() < effMax) {
+                    float hp = treatedWound ? 2.0f : 4.0f;
+                    body.healPart(hp, part);
+                    didSomething = true;
+                }
             }
-            syncBody((PlayerEntity) entity);
+
+            if (didSomething) {
+                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
+                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
+                }else{
+                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
+                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+                }
+                syncBody((PlayerEntity) entity);
+            }
+            return;
         }
     }
 
