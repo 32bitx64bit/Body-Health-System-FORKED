@@ -732,6 +732,24 @@ public abstract class Body {
         updateHealth();
     }
 
+    public void applyRevival(float healPerPart, int bonesToFix) {
+        if (!downed) return;
+        // Heal all damaged body parts by healPerPart up to boosted effective cap
+        for (BodyPart p : getParts()) {
+            float boost = Math.max(0.0f, getBoostForPart(p.getIdentifier()));
+            float effMax = p.getMaxHealth() + boost;
+            if (p.getHealth() < effMax) {
+                p.setHealth(Math.min(effMax, p.getHealth() + healPerPart));
+            }
+        }
+        // Fix bones, preferring torso first (never head)
+        fixBrokenBonesPreferTorso(bonesToFix);
+        // Clear downed and update overall health
+        clearDowned();
+        pendingDeath = false;
+        updateHealth();
+    }
+
     private void fixBrokenBonesPreferTorso(int count) {
         if (count <= 0) return;
         java.util.List<BodyPart> candidates = new java.util.ArrayList<>();

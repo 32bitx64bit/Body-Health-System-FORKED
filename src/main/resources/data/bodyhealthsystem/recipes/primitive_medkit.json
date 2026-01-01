@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SSS",
+    "PPP",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:stick"
+    },
+    "P": {
+      "item": "bodyhealthsystem:herbal_poultices"
+    }
+  },
+  "result": {
+    "item": "bodyhealthsystem:primitive_medkit",
+    "count": 1
+  }
+}

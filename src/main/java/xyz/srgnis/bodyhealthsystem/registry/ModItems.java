@@ -25,6 +25,7 @@ import xyz.srgnis.bodyhealthsystem.items.PortableFanItem;
 import xyz.srgnis.bodyhealthsystem.items.StitchesItem;
 import xyz.srgnis.bodyhealthsystem.items.TourniquetItem;
 import xyz.srgnis.bodyhealthsystem.items.HerbalPoulticesItem;
+import xyz.srgnis.bodyhealthsystem.items.PrimitiveMedkitItem;
 
 public class ModItems {
     public static final Item PLASTER_ITEM = new PlasterItem(new FabricItemSettings());
@@ -36,6 +37,7 @@ public class ModItems {
     public static final Item CHEST_BRACE_ITEM = new ChestBraceItem(new FabricItemSettings());
     public static final Item UPGRADED_MEDKIT_ITEM = new UpgradedMedkitItem(new FabricItemSettings());
     public static final Item TRAUMA_KIT_ITEM = new TraumaKitItem(new FabricItemSettings());
+    public static final Item PRIMITIVE_MEDKIT_ITEM = new PrimitiveMedkitItem(new FabricItemSettings());
     public static final Item WOOL_HELMET = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.HELMET, new FabricItemSettings());
     public static final Item WOOL_CHESTPLATE = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.CHESTPLATE, new FabricItemSettings());
     public static final Item WOOL_LEGGINGS = new WoolClothingItem(net.minecraft.item.ArmorItem.Type.LEGGINGS, new FabricItemSettings());
@@ -62,6 +64,7 @@ public class ModItems {
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"chest_brace"), CHEST_BRACE_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"medkit_upgraded"), UPGRADED_MEDKIT_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"trauma_kit"), TRAUMA_KIT_ITEM);
+        Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"primitive_medkit"), PRIMITIVE_MEDKIT_ITEM);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_helmet"), WOOL_HELMET);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_chestplate"), WOOL_CHESTPLATE);
         Registry.register(Registries.ITEM, new Identifier(BHSMain.MOD_ID,"wool_leggings"), WOOL_LEGGINGS);
@@ -100,6 +103,9 @@ public class ModItems {
         });
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(UPGRADED_MEDKIT_ITEM);
+        });
+        ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
+            content.add(PRIMITIVE_MEDKIT_ITEM);
         });
         ItemGroupEvents.modifyEntriesEvent(BHSMain.BHS_GROUP).register(content -> {
             content.add(TRAUMA_KIT_ITEM);

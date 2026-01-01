@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerLoginConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerLoginNetworking;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.MinecraftServer;
@@ -24,6 +25,7 @@ import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.config.Config;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
+import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
 import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
@@ -282,6 +284,7 @@ public class ServerNetworking {
         boolean isStitches = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES;
         boolean isTourniquet = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET;
         boolean isMedkit = itemStack.getItem() == ModItems.MEDKIT_ITEM;
+        boolean isPrimitiveMedkit = itemStack.getItem() == ModItems.PRIMITIVE_MEDKIT_ITEM;
 
         if (isPlaster) {
             // Remove exactly 1 small wound on targeted limb; if no damaged parts remain, remove from random limb if any small wounds exist
@@ -381,6 +384,34 @@ public class ServerNetworking {
                 serverPlayerEntity.giveItemStack(new ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
             }
             syncBody((PlayerEntity) entity);
+            return;
+        }
+
+        if (isPrimitiveMedkit) {
+            boolean didSomething = false;
+
+            // Heal selected part a bit (up to boosted effective cap)
+            float effMax = part.getMaxHealth() + Math.max(0.0f, body.getBoostForPart(partID));
+            if (part.getHealth() < effMax) {
+                body.healPart(1.5f, part);
+                didSomething = true;
+            }
+
+            // Apply poultice status effect to target (refresh duration; no stacking)
+            if (entity instanceof net.minecraft.entity.LivingEntity le) {
+                le.addStatusEffect(new StatusEffectInstance(ModStatusEffects.HERBAL_POULTICE_EFFECT, 2 * 60 * 20, 0, false, true, true));
+                didSomething = true;
+            }
+
+            if (didSomething) {
+                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
+                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
+                }else{
+                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
+                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
+                }
+                if (entity instanceof PlayerEntity pe) syncBody(pe);
+            }
             return;
         }
 
