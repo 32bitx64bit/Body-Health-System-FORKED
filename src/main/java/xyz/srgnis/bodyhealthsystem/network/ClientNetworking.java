@@ -11,21 +11,31 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.util.Identifier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.config.Config;
-import xyz.srgnis.bodyhealthsystem.config.MidnightConfig;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
 
-//FIXME: this is a bit of a mess
-//FIXME: null pointers
+/**
+ * Client-side network handler for Body Health System.
+ * Handles incoming packets from server and sends requests.
+ */
 public class ClientNetworking {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BHSMain.MOD_ID + "/ClientNetworking");
     private static final Map<Integer, Double> LAST_BODY_TEMP_C = new ConcurrentHashMap<>();
+    
+    // Rate limiting for packet sending (prevent spam)
+    private static final long PACKET_COOLDOWN_MS = 50; // 50ms minimum between packets
+    private static final AtomicLong lastHealPacketTime = new AtomicLong(0);
+    private static final AtomicLong lastTourniquetPacketTime = new AtomicLong(0);
 
     public static void initialize(){
         // Login-time config sync: server tells us if temperature system is required/enabled.
@@ -122,16 +132,32 @@ public class ClientNetworking {
     }
 
     public static void useHealingItem(Entity entity, Identifier partID, ItemStack itemStack){
+        // Rate limit to prevent packet spam
+        long now = System.currentTimeMillis();
+        long last = lastHealPacketTime.get();
+        if (now - last < PACKET_COOLDOWN_MS) {
+            LOGGER.debug("Rate limiting heal packet");
+            return;
+        }
+        lastHealPacketTime.set(now);
+        
         PacketByteBuf buf = PacketByteBufs.create();
-
         buf.writeInt(entity.getId());
         buf.writeIdentifier(partID);
         buf.writeItemStack(itemStack);
-
         ClientPlayNetworking.send(BHSMain.MOD_IDENTIFIER, buf);
     }
 
     public static void removeTourniquet(LivingEntity entity, Identifier partId) {
+        // Rate limit to prevent packet spam
+        long now = System.currentTimeMillis();
+        long last = lastTourniquetPacketTime.get();
+        if (now - last < PACKET_COOLDOWN_MS) {
+            LOGGER.debug("Rate limiting tourniquet packet");
+            return;
+        }
+        lastTourniquetPacketTime.set(now);
+        
         PacketByteBuf buf = PacketByteBufs.create();
         buf.writeInt(entity.getId());
         buf.writeIdentifier(partId);
@@ -172,10 +198,20 @@ public class ClientNetworking {
                 int necState = buf.readInt();
                 float necScale = buf.readFloat();
                 client.execute(() -> {
-                    if (!(entity instanceof BodyProvider bp)) return;
+                    if (!(entity instanceof BodyProvider bp)) {
+                        LOGGER.debug("Entity is not a BodyProvider during body payload read");
+                        return;
+                    }
                     var body = bp.getBody();
+                    if (body == null) {
+                        LOGGER.warn("Body is null during payload read");
+                        return;
+                    }
                     var part = body.getPart(idf);
-                    if (part == null) return;
+                    if (part == null) {
+                        LOGGER.debug("Part {} not found during payload read", idf);
+                        return;
+                    }
                     // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
                     part.setMaxHealth(maxhealth);
                     part.clientSetNecrosis(necState, necScale);
@@ -189,6 +225,7 @@ public class ClientNetworking {
                     part.clientSetTourniquet(tq, tqTicks);
                 });
             } catch (Exception ex) {
+                LOGGER.debug("Exception reading body payload: {}", ex.getMessage());
                 buf.readerIndex(readerIndex);
                 break;
             }

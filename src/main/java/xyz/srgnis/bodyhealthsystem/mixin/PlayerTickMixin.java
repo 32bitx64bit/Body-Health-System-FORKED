@@ -5,11 +5,14 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.network.ServerPlayerEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.Body;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
@@ -20,6 +23,10 @@ import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
 
 @Mixin(PlayerEntity.class)
 public class PlayerTickMixin {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BHSMain.MOD_ID + "/PlayerTickMixin");
+    
+    // Broadcast interval for downed state (in ticks) - increased to reduce network load
+    private static final int DOWNED_BROADCAST_INTERVAL = 40; // 2 seconds instead of 1
 
     @Unique
     private static void clearHeatConditions(PlayerEntity p) {
@@ -104,14 +111,19 @@ public class PlayerTickMixin {
                 }
             }
             body.tickDowned();
-            if (body.isDowned() && (player.age % 20 == 0)) {
+            // Reduced broadcast frequency for downed state to lower network load
+            if (body.isDowned() && (player.age % DOWNED_BROADCAST_INTERVAL == 0)) {
                 ServerNetworking.broadcastBody(player);
             }
 
             // Instant-death from temperature only if system enabled
             if (Config.enableTemperatureSystem && player instanceof ServerPlayerEntity spe) {
                 double tempC = 0.0;
-                try { tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe); } catch (Throwable ignored) {}
+                try {
+                    tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe);
+                } catch (Exception e) {
+                    LOGGER.debug("Failed to get body temperature: {}", e.getMessage());
+                }
                 if (tempC >= 44.0) {
                     player.damage(player.getDamageSources().outOfWorld(), 1000.0f);
                     return;
@@ -368,7 +380,11 @@ public class PlayerTickMixin {
         // Temperature gameplay: only when enabled
         if (!player.getWorld().isClient && Config.enableTemperatureSystem && player instanceof ServerPlayerEntity spe) {
             double tempC = 0.0;
-            try { tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe); } catch (Throwable ignored) {}
+            try {
+                tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe);
+            } catch (Exception e) {
+                LOGGER.debug("Failed to get body temperature for gameplay: {}", e.getMessage());
+            }
 
             // Heat stroke
             if (tempC >= 40.0) {

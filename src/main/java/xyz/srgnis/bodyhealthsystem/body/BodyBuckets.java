@@ -3,18 +3,19 @@ package xyz.srgnis.bodyhealthsystem.body;
 import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Encapsulates per-part absorption and health-boost bucket logic.
  * Body acts as a facade and delegates to this helper to reduce bloat.
+ * Uses ConcurrentHashMap for thread-safe bucket access during network sync.
  */
 class BodyBuckets {
     private final Body body;
-    private final HashMap<Identifier, Float> absorptionBuckets = new HashMap<>();
-    private final HashMap<Identifier, Float> boostBuckets = new HashMap<>();
-    private float lastKnownMaxHealth = -1.0f;
+    private final ConcurrentHashMap<Identifier, Float> absorptionBuckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Identifier, Float> boostBuckets = new ConcurrentHashMap<>();
+    private volatile float lastKnownMaxHealth = -1.0f;
 
     BodyBuckets(Body body) {
         this.body = body;
@@ -42,15 +43,13 @@ class BodyBuckets {
         if (reclaim > 0.0f) addAbsorptionToBuckets(reclaim);
 
         float totalBuckets = 0.0f;
-        for (Identifier id : absorptionBuckets.keySet()) totalBuckets += absorptionBuckets.get(id);
+        for (Float value : absorptionBuckets.values()) totalBuckets += value;
         float entityAbs = body.entity.getAbsorptionAmount();
         if (entityAbs > totalBuckets + 0.001f) {
             addAbsorptionToBuckets(entityAbs - totalBuckets);
         } else if (entityAbs + 0.001f < totalBuckets) {
             float factor = entityAbs <= 0.0f ? 0.0f : (entityAbs / Math.max(totalBuckets, 0.0001f));
-            for (Identifier id : new ArrayList<>(absorptionBuckets.keySet())) {
-                absorptionBuckets.put(id, absorptionBuckets.get(id) * factor);
-            }
+            absorptionBuckets.replaceAll((id, val) -> val * factor);
         }
     }
 
@@ -117,15 +116,13 @@ class BodyBuckets {
         if (reclaim > 0.0f) addBoostToBuckets(reclaim);
 
         float totalBuckets = 0.0f;
-        for (Identifier id : boostBuckets.keySet()) totalBuckets += boostBuckets.get(id);
+        for (Float value : boostBuckets.values()) totalBuckets += value;
         float extra = Math.max(0.0f, body.entity.getMaxHealth() - 20.0f);
         if (extra > totalBuckets + 0.001f) {
             addBoostToBuckets(extra - totalBuckets);
         } else if (extra + 0.001f < totalBuckets) {
             float factor = extra <= 0.0f ? 0.0f : (extra / Math.max(totalBuckets, 0.0001f));
-            for (Identifier id : new ArrayList<>(boostBuckets.keySet())) {
-                boostBuckets.put(id, boostBuckets.get(id) * factor);
-            }
+            boostBuckets.replaceAll((id, val) -> val * factor);
         }
         clampAllPartsToEffectiveCap();
     }

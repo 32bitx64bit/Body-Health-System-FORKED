@@ -11,6 +11,8 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.stat.Stats;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.event.GameEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.mixin.ModifyAppliedDamageInvoker;
 import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
@@ -23,6 +25,15 @@ import java.util.HashMap;
 import java.util.List;
 
 public abstract class Body {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BHSMain.MOD_ID + "/Body");
+    
+    // Constants for magic numbers
+    public static final int BONE_GRACE_TICKS = 2400; // 2 minutes at 20 TPS
+    public static final int BLEEDOUT_TICKS_NORMAL = 80 * 20; // 80 seconds
+    public static final int BLEEDOUT_TICKS_TORSO_BROKEN = 40 * 20; // 40 seconds
+    public static final int BONE_TREATMENT_GRACE_EXTEND = 320; // Extra grace ticks from treatment
+    public static final int FRACTURE_LOCK_TICKS = 2400; // 2 minutes until fracture locks
+    public static final int BROKEN_BONE_EFFECT_DELAY = 300; // 15 seconds at 20 TPS
     protected final HashMap<Identifier, BodyPart> parts = new HashMap<>();
     protected HashMap<Identifier, BodyPart> noCriticalParts = new HashMap<>();
     // Per-part absorption buckets to support "extra hearts" distribution
@@ -115,7 +126,7 @@ public abstract class Body {
                 this.bleedOutTicksRemaining = bodyNbt.getInt("bleedOutTicksRemaining");
             } else if (this.downed && this.bleedOutTicksRemaining <= 0) {
                 // Fallback to a default bleedout timer if missing
-                this.bleedOutTicksRemaining = isTorsoBroken() ? (40 * 20) : (80 * 20);
+                this.bleedOutTicksRemaining = isTorsoBroken() ? BLEEDOUT_TICKS_TORSO_BROKEN : BLEEDOUT_TICKS_NORMAL;
             }
         }
     }
@@ -166,7 +177,16 @@ public abstract class Body {
 
     //Applies the damage to a random part
     public void applyDamageLocalRandom(float amount, DamageSource source){
-        takeDamage(amount, source, getNoCriticalParts().get(entity.getRandom().nextInt(noCriticalParts.size())) );
+        ArrayList<BodyPart> availableParts = getNoCriticalParts();
+        // Guard against empty list - fall back to all parts
+        if (availableParts.isEmpty()) {
+            availableParts = getParts();
+            if (availableParts.isEmpty()) {
+                LOGGER.warn("No body parts available for damage application");
+                return;
+            }
+        }
+        takeDamage(amount, source, availableParts.get(entity.getRandom().nextInt(availableParts.size())));
     }
 
     //Splits the damage into all parts
@@ -369,8 +389,8 @@ public abstract class Body {
             if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             if (p.isBroken()) {
                 p.tickBroken();
-                // After ~2 minutes (2400 ticks), fully break and lock fracture (non-healable by simple items)
-                if (p.getBrokenTicks() == 2400 && !p.isFractureLocked()) {
+                // After ~2 minutes, fully break and lock fracture (non-healable by simple items)
+                if (p.getBrokenTicks() >= FRACTURE_LOCK_TICKS && !p.isFractureLocked()) {
                     if (p.getHealth() > 0.0f) p.setHealth(0.0f);
                     p.setFractureLocked(true);
                     boneStateChanged = true;
@@ -392,7 +412,7 @@ public abstract class Body {
                     maxBrokenTicks = Math.max(maxBrokenTicks, p.getBrokenTicks());
                 }
             }
-            if (maxBrokenTicks >= 300) { // 15 seconds at 20 tps
+            if (maxBrokenTicks >= BROKEN_BONE_EFFECT_DELAY) {
                 player.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
                         ModStatusEffects.BROKEN_BONE, 40, stacks - 1, false, true, true));
             } else {
@@ -553,11 +573,8 @@ public abstract class Body {
             // Do NOT set health to 0 directly: that can bypass the normal vanilla death pipeline
             // (including inventory drops) because it may not be associated with a DamageSource.
             // Instead, request a vanilla death and let PlayerTickMixin apply the kill damage.
-            if (!entity.getWorld().isClient) {
-                pendingDeath = true;
-            } else {
-                entity.setHealth(0);
-            }
+            // Always use pendingDeath - server is authoritative for death states
+            pendingDeath = true;
             return;
         }
 
@@ -616,10 +633,9 @@ public abstract class Body {
     public void onBoneBrokenEvent(BodyPart part) {
         // Start or accelerate the grace timer
         if (boneGraceTicksRemaining <= 0 && !bonePenaltyActive) {
-            // 2 minutes at 20 tps
-            boneGraceTicksRemaining = 2400;
+            boneGraceTicksRemaining = BONE_GRACE_TICKS;
         } else {
-            // subtract 600 ticks, clamp at 0
+            // subtract 600 ticks (30 seconds), clamp at 0
             boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining - 600);
         }
         if (entity instanceof net.minecraft.entity.player.PlayerEntity player && !entity.getWorld().isClient) {
@@ -631,8 +647,7 @@ public abstract class Body {
 
     // Called when "treatment" is applied (e.g., splint), extends grace
     public void onBoneTreatmentApplied() {
-        // Only extend while in grace (not strictly required)
-        boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining) + 320;
+        boneGraceTicksRemaining = Math.max(0, boneGraceTicksRemaining) + BONE_TREATMENT_GRACE_EXTEND;
     }
 
 
@@ -671,7 +686,7 @@ public abstract class Body {
         if (downed) return;
         downed = true;
         // Bleed-out time: 80s normally, 40s if torso bone is broken
-        bleedOutTicksRemaining = isTorsoBroken() ? (40 * 20) : (80 * 20);
+        bleedOutTicksRemaining = isTorsoBroken() ? BLEEDOUT_TICKS_TORSO_BROKEN : BLEEDOUT_TICKS_NORMAL;
     }
 
     public void clearDowned() {
@@ -714,24 +729,11 @@ public abstract class Body {
         }
     }
 
-    public void applyRevival(int healPerPart, int bonesToFix) {
-        if (!downed) return;
-        // Heal all damaged body parts by healPerPart up to boosted effective cap
-        for (BodyPart p : getParts()) {
-            float boost = Math.max(0.0f, getBoostForPart(p.getIdentifier()));
-            float effMax = p.getMaxHealth() + boost;
-            if (p.getHealth() < effMax) {
-                p.setHealth(Math.min(effMax, p.getHealth() + healPerPart));
-            }
-        }
-        // Fix bones, preferring torso first (never head)
-        fixBrokenBonesPreferTorso(bonesToFix);
-        // Clear downed and update overall health
-        clearDowned();
-        pendingDeath = false;
-        updateHealth();
-    }
-
+    /**
+     * Apply revival healing to the downed player.
+     * @param healPerPart Amount to heal each damaged body part (float for precision)
+     * @param bonesToFix Number of broken bones to fix (0 for primitive medkit)
+     */
     public void applyRevival(float healPerPart, int bonesToFix) {
         if (!downed) return;
         // Heal all damaged body parts by healPerPart up to boosted effective cap
@@ -767,7 +769,7 @@ public abstract class Body {
             if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             if (p.isBroken()) candidates.add(p);
         }
-        java.util.Collections.shuffle(candidates, new java.util.Random());
+        java.util.Collections.shuffle(candidates, entity.getRandom());
         for (BodyPart p : candidates) {
             if (count <= 0) break;
             p.setBroken(false);

@@ -1,7 +1,5 @@
 package xyz.srgnis.bodyhealthsystem.network;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.PacketSender;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -20,19 +18,23 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.config.Config;
 import xyz.srgnis.bodyhealthsystem.registry.ModItems;
 import xyz.srgnis.bodyhealthsystem.registry.ModStatusEffects;
-import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 
 import static xyz.srgnis.bodyhealthsystem.BHSMain.id;
 
-//FIXME: this is a bit of a mess
-//FIXME: null pointers
+/**
+ * Server-side network handler for Body Health System.
+ * Handles all incoming packets from clients and broadcasts body state updates.
+ */
 public class ServerNetworking {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BHSMain.MOD_ID + "/ServerNetworking");
 
     public static void initialize(){
         // Login-time config handshake: send required temperature setting and verify client supports it
@@ -52,10 +54,14 @@ public class ServerNetworking {
                 return;
             }
             boolean clientTemp = false;
-            try { if (buf.isReadable()) clientTemp = buf.readBoolean(); } catch (Throwable ignored) {}
+            try {
+                if (buf.isReadable()) clientTemp = buf.readBoolean();
+            } catch (Exception e) {
+                LOGGER.debug("Failed to read client temp config: {}", e.getMessage());
+            }
             // Consume optional client booleans for bones/wounds (server doesn't enforce)
-            try { if (buf.isReadable()) buf.readBoolean(); } catch (Throwable ignored) {}
-            try { if (buf.isReadable()) buf.readBoolean(); } catch (Throwable ignored) {}
+            try { if (buf.isReadable()) buf.readBoolean(); } catch (Exception ignored) {}
+            try { if (buf.isReadable()) buf.readBoolean(); } catch (Exception ignored) {}
             if (Config.enableTemperatureSystem && !clientTemp) {
                 handler.disconnect(Text.literal("This server requires the temperature system to be enabled in Body Health System config."));
             }
@@ -81,7 +87,11 @@ public class ServerNetworking {
                 Entity e = player.getWorld().getEntityById(entityId);
                 if (!(e instanceof ServerPlayerEntity spe)) return;
                 double tempC = 0.0;
-                try { tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe); } catch (Throwable ignored) {}
+                try {
+                    tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe);
+                } catch (Exception e) {
+                    LOGGER.debug("Failed to get body temperature: {}", e.getMessage());
+                }
                 PacketByteBuf out = PacketByteBufs.create();
                 out.writeInt(entityId);
                 out.writeDouble(tempC);
@@ -171,15 +181,29 @@ public class ServerNetworking {
     }
 
     private static void syncBody(MinecraftServer minecraftServer, ServerPlayerEntity serverPlayerEntity, ServerPlayNetworkHandler serverPlayNetworkHandler, PacketByteBuf packetByteBuf, PacketSender packetSender) {
-        syncBody(serverPlayNetworkHandler.player.getWorld().getEntityById(packetByteBuf.readInt()),serverPlayNetworkHandler.player);
+        Entity entity = serverPlayNetworkHandler.player.getWorld().getEntityById(packetByteBuf.readInt());
+        if (entity == null) {
+            LOGGER.debug("Entity not found for sync request");
+            return;
+        }
+        syncBody(entity, serverPlayNetworkHandler.player);
     }
 
     private static void syncBody(Entity entity, ServerPlayerEntity player) {
+        // Validate entity is a valid target
+        if (!(entity instanceof BodyProvider)) {
+            LOGGER.debug("Entity {} is not a BodyProvider", entity.getId());
+            return;
+        }
+        
         PacketByteBuf buf = PacketByteBufs.create();
-
         buf.writeInt(entity.getId());
 
         var body = ((BodyProvider)entity).getBody();
+        if (body == null) {
+            LOGGER.warn("Body is null for entity {}", entity.getId());
+            return;
+        }
         body.prepareBucketSync();
         for (BodyPart part : body.getParts()) {
             Identifier idf = part.getIdentifier();
@@ -231,8 +255,16 @@ public class ServerNetworking {
     }
 
     private static void syncSelf(ServerPlayerEntity self) {
+        if (!(self instanceof BodyProvider)) {
+            LOGGER.warn("Player {} is not a BodyProvider", self.getName().getString());
+            return;
+        }
         PacketByteBuf buf = PacketByteBufs.create();
         var body = ((BodyProvider) self).getBody();
+        if (body == null) {
+            LOGGER.warn("Body is null for player {}", self.getName().getString());
+            return;
+        }
         body.prepareBucketSync();
         for (BodyPart part : body.getParts()) {
             Identifier idf = part.getIdentifier();
@@ -265,16 +297,45 @@ public class ServerNetworking {
         ServerPlayNetworking.send(self, BHSMain.MOD_IDENTIFIER, buf);
     }
 
-    //TODO: to much logic here
+    /**
+     * Handle use of healing items from client.
+     * Validates all inputs before processing to prevent exploits.
+     */
     private static void handleUseHealingItem(MinecraftServer minecraftServer, ServerPlayerEntity serverPlayerEntity, ServerPlayNetworkHandler serverPlayNetworkHandler, PacketByteBuf packetByteBuf, PacketSender packetSender) {
-        Entity entity = serverPlayerEntity.getWorld().getEntityById(packetByteBuf.readInt());
-        Identifier partID = packetByteBuf.readIdentifier();
-        ItemStack itemStack = packetByteBuf.readItemStack();
-
-        if (!(entity instanceof BodyProvider)) return;
+        // Read and validate entity ID
+        int entityId = packetByteBuf.readInt();
+        Entity entity = serverPlayerEntity.getWorld().getEntityById(entityId);
+        if (entity == null) {
+            LOGGER.debug("Entity {} not found for healing item use", entityId);
+            return;
+        }
+        
+        // Validate entity is a BodyProvider
+        if (!(entity instanceof BodyProvider)) {
+            LOGGER.debug("Entity {} is not a BodyProvider", entityId);
+            return;
+        }
+        
         var body = ((BodyProvider) entity).getBody();
+        if (body == null) {
+            LOGGER.warn("Body is null for entity {}", entityId);
+            return;
+        }
+        
+        // Read and validate part ID
+        Identifier partID = packetByteBuf.readIdentifier();
         BodyPart part = body.getPart(partID);
-        if (part == null) return;
+        if (part == null) {
+            LOGGER.debug("Part {} not found on entity {}", partID, entityId);
+            return;
+        }
+        
+        // Read and validate item stack
+        ItemStack itemStack = packetByteBuf.readItemStack();
+        if (itemStack.isEmpty()) {
+            LOGGER.debug("Empty item stack in healing request");
+            return;
+        }
 
         // Guard: ignore empty or unknown items to prevent unintended healing
         if (itemStack.isEmpty()) return;

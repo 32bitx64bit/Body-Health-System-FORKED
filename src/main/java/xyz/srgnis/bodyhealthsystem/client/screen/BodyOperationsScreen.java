@@ -346,14 +346,55 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                         float hbAlloc = handler.getBody().getBoostForPart(part.getIdentifier());
                         if (hbAlloc > 0.0f) list.add(Text.literal("Health Boost: " + Math.round(hbAlloc)));
                         if (part.isBroken()) list.add(Text.literal("Broken"));
-                        // Wound/tourniquet info
-                        try {
-                            int s = (int) part.getClass().getMethod("getSmallWounds").invoke(part);
-                            int l = (int) part.getClass().getMethod("getLargeWounds").invoke(part);
-                            boolean tq = (boolean) part.getClass().getMethod("hasTourniquet").invoke(part);
-                            int tqTicks = (int) part.getClass().getMethod("getTourniquetTicks").invoke(part);
-                            int necState = (int) part.getClass().getMethod("getNecrosisState").invoke(part);
-                            float nScale = (float) part.getClass().getMethod("getNecrosisScale").invoke(part);
+                        // Wound/tourniquet info - use direct method calls instead of reflection
+                        int s = part.getSmallWounds();
+                        int l = part.getLargeWounds();
+                        boolean tq = part.hasTourniquet();
+                        int tqTicks = part.getTourniquetTicks();
+                        int necState = part.getNecrosisState();
+                        float nScale = part.getNecrosisScale();
+                        if (l > 0) list.add(Text.literal("Large wound"));
+                        else if (s > 0) list.add(Text.literal("Small wound"));
+                        if (tq) {
+                            // Show countdowns by part type:
+                            // - Head: 15s to necrosis, then 15s to death
+                            // - Others: 7min safe, then 4min necrosis
+                            int total = tqTicks / 20;
+                            boolean isHead = b.partId.equals(PlayerBodyParts.HEAD);
+                            if (isHead) {
+                                if (necState == 0) {
+                                    int remaining = Math.max(0, 15 - total);
+                                    list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (to necrosis)"));
+                                } else if (necState == 1) {
+                                    int necElapsed = Math.max(0, total - 15);
+                                    int necRemaining = Math.max(0, 15 - necElapsed);
+                                    list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (to death)"));
+                                } else {
+                                    list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
+                                }
+                            } else {
+                                if (necState == 0) {
+                                    // Clamp to [0, 7*60]
+                                    int totalClamped = Math.max(0, Math.min(7*60, total));
+                                    int remaining = 7*60 - totalClamped;
+                                    list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (safe)"));
+                                } else if (necState == 1) {
+                                    // Clamp necrosis elapsed to [0, 4*60]
+                                    int necElapsed = Math.max(0, total - 7*60);
+                                    necElapsed = Math.min(necElapsed, 4*60);
+                                    int necRemaining = 4*60 - necElapsed;
+                                    list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (necrosis)"));
+                                } else {
+                                    list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
+                                }
+                            }
+                        }
+                        if (necState == 1) {
+                            String phase = tq ? "Active" : "Healing";
+                            list.add(Text.literal("Necrosis: "+phase));
+                        }
+                        if (necState == 2) list.add(Text.literal("Necrosis: permanent"));
+                        if (nScale < 1.0f) list.add(Text.literal("MaxHP: "+Math.round(nScale*100)+"%"));
                             if (l > 0) list.add(Text.literal("Large wound"));
                             else if (s > 0) list.add(Text.literal("Small wound"));
                             if (tq) {
@@ -394,9 +435,6 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                                 String phase = tq ? "Active" : "Healing";
                                 list.add(Text.literal("Necrosis: "+phase));
                             }
-                            if (necState == 2) list.add(Text.literal("Necrosis: permanent"));
-                            if (nScale < 1.0f) list.add(Text.literal("MaxHP: "+Math.round(nScale*100)+"%"));
-                        } catch (Throwable ignored) {}
                         drawContext.drawTooltip(this.textRenderer, list, mouseX, mouseY);
                     }
                 }
@@ -516,12 +554,9 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         // Skip overlays in temperature mode.
         if (showTemperature) return;
 
-        // Read wound counts (reflection keeps client independent)
-        int s = 0, l = 0;
-        try {
-            s = (int) p.getClass().getMethod("getSmallWounds").invoke(p);
-            l = (int) p.getClass().getMethod("getLargeWounds").invoke(p);
-        } catch (Throwable ignored) {}
+        // Read wound counts directly - no reflection needed
+        int s = p.getSmallWounds();
+        int l = p.getLargeWounds();
 
         boolean boneSystemEnabled = xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem;
         boolean broken = boneSystemEnabled && p.isBroken();

@@ -5,11 +5,15 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.collection.DefaultedList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import xyz.srgnis.bodyhealthsystem.BHSMain;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 
 //TODO: Allow Override max health on write/read to nbt?
 //TODO: Check LivingEntity.getEquippedStack(), could be alternative to the actual implementation for getting the armor
 public abstract class BodyPart {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BHSMain.MOD_ID + "/BodyPart");
     private float maxHealth; // base max (unscaled)
     private float health;
     private boolean broken = false;
@@ -70,10 +74,14 @@ public abstract class BodyPart {
             if (body != null && identifier != null) {
                 boost = Math.max(0.0f, body.getBoostForPart(identifier));
             }
-        } catch (Throwable ignored) {}
+        } catch (Exception e) {
+            LOGGER.debug("Failed to get boost for part {}: {}", identifier, e.getMessage());
+        }
         float cap = getMaxHealth() + boost;
         this.health = Math.min(Math.max(health, 0), cap);
-        body.checkNoCritical(this);
+        if (body != null) {
+            body.checkNoCritical(this);
+        }
     }
 
     public void heal(){
@@ -82,7 +90,9 @@ public abstract class BodyPart {
             if (body != null && identifier != null) {
                 boost = Math.max(0.0f, body.getBoostForPart(identifier));
             }
-        } catch (Throwable ignored) {}
+        } catch (Exception e) {
+            LOGGER.debug("Failed to get boost for part {}: {}", identifier, e.getMessage());
+        }
         setHealth(getMaxHealth() + boost);
     }
 
@@ -242,7 +252,9 @@ public abstract class BodyPart {
             if (body != null && identifier != null) {
                 boost = Math.max(0.0f, body.getBoostForPart(identifier));
             }
-        } catch (Throwable ignored) {}
+        } catch (Exception e) {
+            LOGGER.debug("Failed to get boost for part {}: {}", identifier, e.getMessage());
+        }
         return health < (getMaxHealth() + boost);
     }
 
@@ -326,7 +338,9 @@ public abstract class BodyPart {
             if (entity != null && entity.getWorld() != null && entity.getWorld().isClient) {
                 return Math.max(0, tqClientTicks);
             }
-        } catch (Throwable ignored) {}
+        } catch (Exception e) {
+            LOGGER.debug("Failed to check client world for tourniquet ticks: {}", e.getMessage());
+        }
         int eff = tqOnTicks - tqOffAccumulatedTicks;
         if (eff < 0) eff = 0;
         return eff;
