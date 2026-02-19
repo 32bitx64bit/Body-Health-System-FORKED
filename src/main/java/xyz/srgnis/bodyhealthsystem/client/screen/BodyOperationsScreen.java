@@ -108,13 +108,12 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
     // Computed body scale (maps GUIConstants.SCALED_* to destination pixels)
     private float bodyScale = 1.0f;
 
-    // Global toggle for bone overlay
-    private static boolean BONE_LAYER_ENABLED = true;
+    // Instance toggle for bone overlay (was incorrectly static - each screen should have its own state)
+    private boolean boneLayerEnabled = true;
 
     // Session flags for medkit behavior
     private boolean disabledByMedkit = false;
     private boolean boneLayerWasEnabledOnOpen = false;
-    private boolean usedMedkit = false;
 
     // Small vertical shift to keep feet labels within the GUI
     private static final float BODY_Y_SHIFT_LOGICAL = 5.0f; // logical pixels, scaled by DRAW_SCALE
@@ -139,14 +138,14 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         super.init();
         // Enforce bone system disabled: force bone layer off and block medkit override
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
-            BONE_LAYER_ENABLED = false;
+            boneLayerEnabled = false;
             boneLayerWasEnabledOnOpen = false;
             disabledByMedkit = false;
         }
         // If opened with an item (medkit), disable bone layer if it was enabled, remember to restore on successful use
-        if (!this.handler.getItemStack().isEmpty() && BONE_LAYER_ENABLED) {
+        if (!this.handler.getItemStack().isEmpty() && boneLayerEnabled) {
             boneLayerWasEnabledOnOpen = true;
-            BONE_LAYER_ENABLED = false;
+            boneLayerEnabled = false;
             disabledByMedkit = true;
         }
         // Request fresh body data from server so per-part buckets are up-to-date
@@ -216,10 +215,10 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         boneToggleBtn = ButtonWidget.builder(Text.literal("Bone Layer"), b -> {
             if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
                 // Enforce off when system disabled
-                BONE_LAYER_ENABLED = false;
+                boneLayerEnabled = false;
                 return;
             }
-            BONE_LAYER_ENABLED = !BONE_LAYER_ENABLED;
+            boneLayerEnabled = !boneLayerEnabled;
         }).dimensions(btnX, btnY, btnW, btnH).build();
         boneToggleBtn.active = xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem;
         addDrawableChild(boneToggleBtn);
@@ -323,7 +322,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         super.render(drawContext, mouseX, mouseY, delta);
         // Enforce bone overlay toggle state based on config
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
-            BONE_LAYER_ENABLED = false;
+            boneLayerEnabled = false;
             if (boneToggleBtn != null) boneToggleBtn.active = false;
         } else {
             if (boneToggleBtn != null) boneToggleBtn.active = true;
@@ -395,46 +394,6 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
                         }
                         if (necState == 2) list.add(Text.literal("Necrosis: permanent"));
                         if (nScale < 1.0f) list.add(Text.literal("MaxHP: "+Math.round(nScale*100)+"%"));
-                            if (l > 0) list.add(Text.literal("Large wound"));
-                            else if (s > 0) list.add(Text.literal("Small wound"));
-                            if (tq) {
-                                // Show countdowns by part type:
-                                // - Head: 15s to necrosis, then 15s to death
-                                // - Others: 7min safe, then 4min necrosis
-                                int total = tqTicks / 20;
-                                boolean isHead = b.partId.equals(PlayerBodyParts.HEAD);
-                                if (isHead) {
-                                    if (necState == 0) {
-                                        int remaining = Math.max(0, 15 - total);
-                                        list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (to necrosis)"));
-                                    } else if (necState == 1) {
-                                        int necElapsed = Math.max(0, total - 15);
-                                        int necRemaining = Math.max(0, 15 - necElapsed);
-                                        list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (to death)"));
-                                    } else {
-                                        list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
-                                    }
-                                } else {
-                                    if (necState == 0) {
-                                        // Clamp to [0, 7*60]
-                                        int totalClamped = Math.max(0, Math.min(7*60, total));
-                                        int remaining = 7*60 - totalClamped;
-                                        list.add(Text.literal("Tourniquet: "+formatMMSS(remaining)+" (safe)"));
-                                    } else if (necState == 1) {
-                                        // Clamp necrosis elapsed to [0, 4*60]
-                                        int necElapsed = Math.max(0, total - 7*60);
-                                        necElapsed = Math.min(necElapsed, 4*60);
-                                        int necRemaining = 4*60 - necElapsed;
-                                        list.add(Text.literal("Tourniquet: "+formatMMSS(necRemaining)+" (necrosis)"));
-                                    } else {
-                                        list.add(Text.literal("Tourniquet: 00:00 (permanent)"));
-                                    }
-                                }
-                            }
-                            if (necState == 1) {
-                                String phase = tq ? "Active" : "Healing";
-                                list.add(Text.literal("Necrosis: "+phase));
-                            }
                         drawContext.drawTooltip(this.textRenderer, list, mouseX, mouseY);
                     }
                 }
@@ -448,7 +407,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         // If this screen was opened with a medkit and we auto-disabled the bone layer,
         // restore it on close to the previous state (ensures bones reappear next open).
         if (disabledByMedkit && boneLayerWasEnabledOnOpen && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
-            BONE_LAYER_ENABLED = true;
+            boneLayerEnabled = true;
         }
         super.close();
     }
@@ -562,7 +521,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         boolean broken = boneSystemEnabled && p.isBroken();
 
         // If bone overlay is enabled, render bones first.
-        if (boneSystemEnabled && BONE_LAYER_ENABLED) {
+        if (boneSystemEnabled && boneLayerEnabled) {
             Identifier tex = selectBoneTexture(partId, broken);
             if (isTextureAvailable(tex)) {
                 if (partId.equals(PlayerBodyParts.LEFT_ARM) || partId.equals(PlayerBodyParts.RIGHT_ARM)) {
@@ -595,7 +554,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
         drawWoundCounts(ctx, x, y, w, h, s, l);
 
         // If bone system is enabled but the bone layer is off, still indicate broken bones.
-        if (boneSystemEnabled && !BONE_LAYER_ENABLED && broken && !partId.equals(PlayerBodyParts.HEAD)) {
+        if (boneSystemEnabled && !boneLayerEnabled && broken && !partId.equals(PlayerBodyParts.HEAD)) {
             int icon = Math.max(8, Math.min(12, Math.round(10 * DRAW_SCALE)));
             ctx.drawTexture(TEX_BONEMAIN_BROKEN, x + 1, y + 1, icon, icon, 0.0F, 0.0F, 16, 16, 16, 16);
         }
@@ -716,7 +675,7 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             }
             // Restore bone layer if we auto-disabled it when opening for medkit
             if (disabledByMedkit && boneLayerWasEnabledOnOpen && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {
-                BONE_LAYER_ENABLED = true;
+                boneLayerEnabled = true;
             }
             BodyOperationsScreen.this.close();
         }

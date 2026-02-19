@@ -19,7 +19,6 @@ import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.client.screen.BodyOperationsScreenHandler;
 import xyz.srgnis.bodyhealthsystem.registry.ScreenHandlers;
 
-//FIXME: null pointers
 public class MedkitItem extends Item {
 	private static final String TARGET_NBT = "MedkitTargetId";
 	public MedkitItem(Settings settings) {
@@ -37,6 +36,9 @@ public class MedkitItem extends Item {
 	public ActionResult useOnEntity(ItemStack stack, PlayerEntity user, LivingEntity entity, Hand hand) {
 		if(entity instanceof BodyProvider bp){
 			var body = bp.getBody();
+			if (body == null) {
+				return ActionResult.PASS;
+			}
 			// If target is downed, start revival channel instead of opening UI
 			if (body.isDowned()) {
 				// Only allow one reviver
@@ -77,10 +79,13 @@ public class MedkitItem extends Item {
 			var tag = stack.getNbt();
 			if (tag != null && tag.contains(TARGET_NBT)) {
 				var e = world.getEntityById(tag.getInt(TARGET_NBT));
-				if (e instanceof LivingEntity le && le instanceof BodyProvider) {
-					((BodyProvider) le).getBody().endRevive(pe);
-					// Notify all clients that revival has stopped (resume timer)
-					xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(le);
+				if (e instanceof LivingEntity le && le instanceof BodyProvider bp) {
+					var body = bp.getBody();
+					if (body != null) {
+						body.endRevive(pe);
+						// Notify all clients that revival has stopped (resume timer)
+						xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(le);
+					}
 				}
 				tag.remove(TARGET_NBT);
 				if (tag.isEmpty()) stack.setNbt(null);
@@ -99,8 +104,11 @@ public class MedkitItem extends Item {
 				tag.remove(TARGET_NBT);
 				if (tag.isEmpty()) stack.setNbt(null);
 			}
-			if (target instanceof BodyProvider) {
-				var body = ((BodyProvider) target).getBody();
+			if (target instanceof BodyProvider bp) {
+				var body = bp.getBody();
+				if (body == null) {
+					return stack;
+				}
 				body.endRevive(pe);
 				// Eligibility: head not destroyed; if torso destroyed, not allowed for base medkit
 				var head = body.getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD);
