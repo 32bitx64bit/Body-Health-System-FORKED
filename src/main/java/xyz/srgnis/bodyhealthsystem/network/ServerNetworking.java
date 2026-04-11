@@ -89,8 +89,8 @@ public class ServerNetworking {
                 double tempC = 0.0;
                 try {
                     tempC = gavinx.temperatureapi.BodyTemperatureState.getC(spe);
-                } catch (Exception e) {
-                    LOGGER.debug("Failed to get body temperature: {}", e.getMessage());
+                } catch (Exception ex) {
+                    LOGGER.debug("Failed to get body temperature: {}", ex.getMessage());
                 }
                 PacketByteBuf out = PacketByteBufs.create();
                 out.writeInt(entityId);

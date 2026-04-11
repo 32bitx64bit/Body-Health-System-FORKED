@@ -671,7 +671,6 @@ public class BodyOperationsScreen extends HandledScreen<BodyOperationsScreenHand
             // Otherwise, route to generic item use (Tourniquet item toggles apply/remove; other items heal, etc.)
             if (!item.isEmpty()) {
                 ClientNetworking.useHealingItem(BodyOperationsScreen.this.handler.getEntity(), part.getIdentifier(), item);
-                usedMedkit = true;
             }
             // Restore bone layer if we auto-disabled it when opening for medkit
             if (disabledByMedkit && boneLayerWasEnabledOnOpen && xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) {

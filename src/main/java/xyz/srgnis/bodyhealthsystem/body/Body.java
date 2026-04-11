@@ -769,7 +769,7 @@ public abstract class Body {
             if (p.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             if (p.isBroken()) candidates.add(p);
         }
-        java.util.Collections.shuffle(candidates, entity.getRandom());
+        java.util.Collections.shuffle(candidates);
         for (BodyPart p : candidates) {
             if (count <= 0) break;
             p.setBroken(false);
