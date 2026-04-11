@@ -362,17 +362,11 @@ public class PlayerTickMixin {
                 player.removeStatusEffect(StatusEffects.SLOWNESS);
             }
         } else {
-            if (!player.getWorld().isClient) {
-                if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
+            if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
+                net.minecraft.util.math.Box standingBox = player.getDimensions(EntityPose.STANDING).getBoxAt(player.getPos());
+                if (player.getWorld().isSpaceEmpty(player, standingBox)) {
                     player.setSwimming(false);
                     player.setPose(EntityPose.STANDING);
-                }
-            } else {
-                if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
-                    if (player.age % 10 == 0) {
-                        player.setSwimming(false);
-                        player.setPose(EntityPose.STANDING);
-                    }
                 }
             }
         }

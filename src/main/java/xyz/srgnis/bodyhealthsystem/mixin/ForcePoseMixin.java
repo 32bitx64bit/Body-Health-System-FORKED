@@ -38,8 +38,11 @@ public abstract class ForcePoseMixin {
         } else {
             // Restore standing if we previously forced crawling and the player is not actually swimming in water
             if (player.getPose() == EntityPose.SWIMMING && !player.isTouchingWater()) {
-                player.setSwimming(false);
-                player.setPose(EntityPose.STANDING);
+                net.minecraft.util.math.Box standingBox = player.getDimensions(EntityPose.STANDING).getBoxAt(player.getPos());
+                if (player.getWorld().isSpaceEmpty(player, standingBox)) {
+                    player.setSwimming(false);
+                    player.setPose(EntityPose.STANDING);
+                }
             }
         }
     }
