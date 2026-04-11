@@ -26,6 +26,11 @@ public class OnApplyDamage {
         }
         if (!((PlayerEntity) (Object)this).isInvulnerableTo(source)) {
             PlayerEntity player = (PlayerEntity)(Object)this;
+
+            if (player.isBlocking() && !source.isIn(DamageTypeTags.BYPASSES_SHIELD) && player.blockedByShield(source)) {
+                return 0.0f;
+            }
+
             Body body = ((BodyProvider)this).getBody();
             body.applyDamageBySource(amount, source);
 
