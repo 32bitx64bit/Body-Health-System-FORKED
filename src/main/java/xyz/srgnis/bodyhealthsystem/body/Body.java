@@ -34,6 +34,8 @@ public abstract class Body {
     public static final int BONE_TREATMENT_GRACE_EXTEND = 320; // Extra grace ticks from treatment
     public static final int FRACTURE_LOCK_TICKS = 2400; // 2 minutes until fracture locks
     public static final int BROKEN_BONE_EFFECT_DELAY = 300; // 15 seconds at 20 TPS
+    public static final int CHEST_BONE_DAMAGE_INTERVAL_TICKS = 60 * 20; // 1 minute at 20 TPS
+    public static final float CHEST_BONE_DAMAGE = 1.0f; // one torso body-part HP
     protected final HashMap<Identifier, BodyPart> parts = new HashMap<>();
     protected HashMap<Identifier, BodyPart> noCriticalParts = new HashMap<>();
     // Per-part absorption buckets to support "extra hearts" distribution
@@ -54,6 +56,7 @@ public abstract class Body {
     protected int boneGraceTicksRemaining = 0; // counts down after a break
     protected boolean bonePenaltyActive = false; // once grace hits 0, periodic health loss active
     protected int bonePenaltyTickCounter = 0; // counts to 10s windows
+    protected int chestBoneDamageTickCounter = 0;
 
     // Downed / revival state (server authoritative, not persisted)
     protected boolean downed = false;
@@ -324,6 +327,18 @@ public abstract class Body {
                 || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM);
     }
 
+    private boolean isLegOrFoot(BodyPart part) {
+        var id = part.getIdentifier();
+        return id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG)
+                || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG)
+                || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT)
+                || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT);
+    }
+
+    private boolean isChest(BodyPart part) {
+        return part.getIdentifier().equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+    }
+
     private void assignArmBrokenHalf(BodyPart part) {
         if (part.getBrokenTopHalf() == null) {
             part.setBrokenTopHalf(entity.getRandom().nextBoolean());
@@ -340,28 +355,27 @@ public abstract class Body {
         if (entity.getWorld().isClient) return; // server-side control
         if (!xyz.srgnis.bodyhealthsystem.config.Config.enableBoneSystem) return;
 
-        // Determine impairment: either bone broken OR limb destroyed (HP <= 0) counts as impaired
+        // Determine impairment: either bone broken OR body part destroyed (HP <= 0) counts as impaired
         int impairedArms = 0;
         int impairedLegsFeet = 0;
+        int impairedChest = 0;
         for (BodyPart p : getParts()) {
             var id = p.getIdentifier();
             if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.HEAD)) continue;
             boolean impaired = p.isBroken() || p.getHealth() <= 0.0f;
             if (!impaired) continue;
-            if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_ARM)
-                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_ARM)) impairedArms++;
-            if (id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_LEG)
-                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_LEG)
-                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.LEFT_FOOT)
-                    || id.equals(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.RIGHT_FOOT)) impairedLegsFeet++;
+            if (isArm(p)) impairedArms++;
+            if (isLegOrFoot(p)) impairedLegsFeet++;
+            if (isChest(p)) impairedChest++;
         }
-        boolean anyImpaired = (impairedArms + impairedLegsFeet) > 0;
+        boolean anyImpaired = (impairedArms + impairedLegsFeet + impairedChest) > 0;
 
         // If neither bones are broken nor any limb destroyed, deactivate timers and clear negatives
         if (!anyBoneBroken() && !anyImpaired) {
             bonePenaltyActive = false;
             boneGraceTicksRemaining = 0;
             bonePenaltyTickCounter = 0;
+            chestBoneDamageTickCounter = 0;
             // Clear bone-based effects
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS);
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE);
@@ -400,6 +414,7 @@ public abstract class Body {
         }
         if (boneStateChanged) {
             // Sync new locked state to the player and watchers
+            updateHealth();
             xyz.srgnis.bodyhealthsystem.network.ServerNetworking.broadcastBody(player);
         }
         // Apply Broken Bone status effect with amplifier = min(totalBroken, 3) - 1 (i.e., I..III caps at 3)
@@ -422,18 +437,33 @@ public abstract class Body {
             player.removeStatusEffect(ModStatusEffects.BROKEN_BONE);
         }
 
-        // Apply vanilla debuffs based on impairment (broken or destroyed)
-        // Arms impaired -> Weakness; Legs/Feet impaired -> Slowness; Any impaired -> Mining Fatigue
-        int weakAmp = impairedArms >= 2 ? 1 : (impairedArms >= 1 ? 0 : -1);
+        // Apply hidden vanilla debuffs based on which body part is impaired.
+        int upperBodyImpairments = impairedArms + impairedChest;
+        int weakAmp = upperBodyImpairments >= 2 ? 1 : (upperBodyImpairments >= 1 ? 0 : -1);
         int slowAmp = impairedLegsFeet >= 2 ? 1 : (impairedLegsFeet >= 1 ? 0 : -1);
-        int fatigueAmp = (impairedArms + impairedLegsFeet) >= 2 ? 0 : (impairedArms + impairedLegsFeet) >= 4 ? 1 : ((impairedArms + impairedLegsFeet) >= 1 ? 0 : -1);
+        int fatigueAmp = upperBodyImpairments >= 2 ? 1 : (upperBodyImpairments >= 1 ? 0 : -1);
         // Clamp and apply
-        if (slowAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, slowAmp, false, false, true));
+        if (slowAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 40, slowAmp, false, false, false));
         else player.removeStatusEffect(StatusEffects.SLOWNESS);
-        if (weakAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, weakAmp, false, false, true));
+        if (weakAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 40, weakAmp, false, false, false));
         else player.removeStatusEffect(StatusEffects.WEAKNESS);
-        if (fatigueAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, fatigueAmp, false, false, true));
+        if (fatigueAmp >= 0) player.addStatusEffect(new StatusEffectInstance(StatusEffects.MINING_FATIGUE, 40, fatigueAmp, false, false, false));
         else player.removeStatusEffect(StatusEffects.MINING_FATIGUE);
+
+        BodyPart chest = getPart(xyz.srgnis.bodyhealthsystem.body.player.PlayerBodyParts.TORSO);
+        if (chest != null && chest.isBroken()) {
+            chestBoneDamageTickCounter++;
+            if (chestBoneDamageTickCounter >= CHEST_BONE_DAMAGE_INTERVAL_TICKS) {
+                chestBoneDamageTickCounter = 0;
+                if (chest.getHealth() > 0.0f) {
+                    chest.damage(CHEST_BONE_DAMAGE);
+                    updateHealth();
+                    ServerNetworking.broadcastBody(player);
+                }
+            }
+        } else {
+            chestBoneDamageTickCounter = 0;
+        }
 
         // Retain BLEEDING_EFFECT for future use; do not manage/display it here anymore
 
