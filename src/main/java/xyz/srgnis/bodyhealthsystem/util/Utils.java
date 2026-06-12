@@ -1,19 +1,18 @@
 package xyz.srgnis.bodyhealthsystem.util;
 
 import net.minecraft.item.ArmorItem;
+import net.minecraft.util.math.random.Random;
 import xyz.srgnis.bodyhealthsystem.config.Config;
 import xyz.srgnis.bodyhealthsystem.items.StrawHatItem;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 
 import static xyz.srgnis.bodyhealthsystem.constants.ArmorSlots.*;
 
 public class Utils {
-    public static List<Float> n_random(float total, float size) {
-        Random r = new Random();
+    public static List<Float> n_random(float total, int size, Random r) {
         List<Float> randoms = new ArrayList<>();
 
         //random numbers
@@ -25,11 +24,9 @@ public class Utils {
         }
 
         //scale to the desired target sum
-        float scale = total / sum;
-        sum = 0;
+        float scale = sum == 0 ? 0 : total / sum;
         for (int i = 0; i < size; i++) {
             randoms.set(i, (randoms.get(i) * scale));
-            sum += randoms.get(i);
         }
 
         return randoms;

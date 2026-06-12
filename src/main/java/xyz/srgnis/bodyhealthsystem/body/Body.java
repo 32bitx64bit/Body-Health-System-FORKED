@@ -38,10 +38,6 @@ public abstract class Body {
     public static final float CHEST_BONE_DAMAGE = 1.0f; // one torso body-part HP
     protected final HashMap<Identifier, BodyPart> parts = new HashMap<>();
     protected HashMap<Identifier, BodyPart> noCriticalParts = new HashMap<>();
-    // Per-part absorption buckets to support "extra hearts" distribution
-    protected final HashMap<Identifier, Float> absorptionBuckets = new HashMap<>();
-    // Per-part health-boost buckets to support direct max-health increases distribution
-    protected final HashMap<Identifier, Float> boostBuckets = new HashMap<>();
     protected LivingEntity entity;
 
     private final BodyBuckets buckets = new BodyBuckets(this);
@@ -69,9 +65,6 @@ public abstract class Body {
 
     public void addPart(Identifier identifier, BodyPart part){
         parts.put(identifier, part);
-        // Initialize absorption/boost buckets for this part
-        absorptionBuckets.put(identifier, 0.0f);
-        boostBuckets.put(identifier, 0.0f);
         buckets.onPartAdded(identifier);
     }
 
@@ -209,7 +202,7 @@ public abstract class Body {
 
     //Randomly splits the damage into list of parts
     public void applyDamageListRandom(float amount, DamageSource source, List<BodyPart> parts){
-        List<Float> damages = Utils.n_random(amount, parts.size());
+        List<Float> damages = Utils.n_random(amount, parts.size(), entity.getRandom());
 
         int i = 0;
         for(BodyPart bodyPart : parts){
@@ -380,8 +373,7 @@ public abstract class Body {
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS);
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.MINING_FATIGUE);
             player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.WEAKNESS);
-            // Clear bleeding indicator
-            player.removeStatusEffect(ModStatusEffects.BLEEDING_EFFECT);
+            // NOTE: BLEEDING_EFFECT is owned by the wounding system (PlayerTickMixin); do not clear it here.
             return;
         }
 
@@ -581,7 +573,7 @@ public abstract class Body {
             StatusEffectInstance s = entity.getStatusEffect(effect);
             if(s == null){
                 entity.addStatusEffect(new StatusEffectInstance(effect, 40, amplifier));
-            }else if(s.getAmplifier() > amplifier || s.getDuration() <= 5 || s.getAmplifier() != amplifier){
+            }else if(s.getAmplifier() != amplifier || s.getDuration() <= 5){
                 // Replace stronger/slower effects with our capped one, or refresh if near expiration
                 entity.addStatusEffect(new StatusEffectInstance(effect, 40, amplifier));
             }
@@ -854,19 +846,6 @@ public abstract class Body {
 
     protected void consumeAbsorptionFromBucket(BodyPart part, float amount) {
         buckets.consumeAbsorption(part, amount);
-    }
-
-    protected float getBoostBucket(BodyPart part) {
-        if (part == null) return 0.0f;
-        return boostBuckets.getOrDefault(part.getIdentifier(), 0.0f);
-    }
-
-    protected void consumeBoostFromBucket(BodyPart part, float amount) {
-        if (part == null || amount <= 0.0f) return;
-        Identifier id = part.getIdentifier();
-        float current = boostBuckets.getOrDefault(id, 0.0f);
-        float newVal = Math.max(0.0f, current - amount);
-        boostBuckets.put(id, newVal);
     }
 
     // Expose for networking/UI

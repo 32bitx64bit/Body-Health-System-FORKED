@@ -57,8 +57,8 @@ public class PlayerBody extends Body {
         } else if (source.isOf(DamageTypes.FIREBALL)) {
             applyDamageFullRandom(amount, source);
             // Fireballs are projectile-like: allow wounds.
-            BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
-            if (bhs$canApplyWoundsFor(source, true)) applyWoundChances(p, true);
+            BodyPart p = randomNoCriticalPart();
+            if (p != null && bhs$canApplyWoundsFor(source, true)) applyWoundChances(p, true);
         } else if (source.isOf(DamageTypes.STARVE)) {
             applyDamageLocal(amount, source, this.getPart(TORSO));
         } else if (source.isOf(DamageTypes.DROWN)) {
@@ -80,18 +80,32 @@ public class PlayerBody extends Body {
                 applyDamageLocal(amount, source, part);
                 if (bhs$canApplyWoundsFor(source, true)) applyWoundChances(part, true);
             } else {
-                BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
-                applyDamageLocal(amount, source, p);
-                if (bhs$canApplyWoundsFor(source, true)) applyWoundChances(p, true);
+                BodyPart p = randomNoCriticalPart();
+                if (p != null) {
+                    applyDamageLocal(amount, source, p);
+                    if (bhs$canApplyWoundsFor(source, true)) applyWoundChances(p, true);
+                }
             }
             // Clear after consumption to avoid stale data
             ProjectileHitTracker.clear((PlayerEntity) entity);
         } else {
-            BodyPart p = getNoCriticalParts().get(entity.getRandom().nextInt(getNoCriticalParts().size()));
-            applyDamageLocal(amount, source, p);
-            if (bhs$canApplyWoundsFor(source, false)) applyWoundChances(p, false);
+            BodyPart p = randomNoCriticalPart();
+            if (p != null) {
+                applyDamageLocal(amount, source, p);
+                if (bhs$canApplyWoundsFor(source, false)) applyWoundChances(p, false);
+            }
         }
 
+    }
+
+    // Pick a random non-critical part, falling back to any part. Returns null only if the body has no parts.
+    private BodyPart randomNoCriticalPart() {
+        java.util.List<BodyPart> candidates = getNoCriticalParts();
+        if (candidates.isEmpty()) {
+            candidates = getParts();
+            if (candidates.isEmpty()) return null;
+        }
+        return candidates.get(entity.getRandom().nextInt(candidates.size()));
     }
 
     private boolean bhs$canApplyWoundsFor(DamageSource source, boolean projectile) {
@@ -141,14 +155,6 @@ public class PlayerBody extends Body {
         boolean bothFeetBroken = leftFoot != null && rightFoot != null && leftFoot.isBroken() && rightFoot.isBroken();
         // Require crawling only if both legs AND both feet are broken (use bone break state, not HP)
         return bothLegsBroken && bothFeetBroken;
-    }
-
-    @Override
-    public float takeDamage(float amount, DamageSource source, BodyPart part){
-        // Player-specific armor processing first
-        amount = applyArmorToDamage(source, amount, part);
-        // Now delegate to base shared pipeline (handles absorption, poison-specifics, bone-break, stats)
-        return super.takeDamage(amount, source, part);
     }
 
     public float applyArmorToDamage(DamageSource source, float amount, BodyPart part){

@@ -21,6 +21,7 @@ import net.minecraft.util.math.BlockPos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import xyz.srgnis.bodyhealthsystem.BHSMain;
+import xyz.srgnis.bodyhealthsystem.body.Body;
 import xyz.srgnis.bodyhealthsystem.body.BodyPart;
 import xyz.srgnis.bodyhealthsystem.body.player.BodyProvider;
 import xyz.srgnis.bodyhealthsystem.config.Config;
@@ -150,10 +151,8 @@ public class ServerNetworking {
                     if (leg != null) leg.setTourniquet(false);
                     if (foot != null) foot.setTourniquet(false);
                 }
-                // Refund one Tourniquet item only if not using stitches item as a fallback
-                if (!(player.isUsingItem() && player.getActiveItem() != null && player.getActiveItem().getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES)) {
-                    player.giveItemStack(new net.minecraft.item.ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
-                }
+                // Refund one Tourniquet item (handler already returned early if the player is using stitches)
+                player.giveItemStack(new net.minecraft.item.ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
                 // Sync
                 if (e instanceof PlayerEntity pe) syncBody(pe);
             });
@@ -181,12 +180,16 @@ public class ServerNetworking {
     }
 
     private static void syncBody(MinecraftServer minecraftServer, ServerPlayerEntity serverPlayerEntity, ServerPlayNetworkHandler serverPlayNetworkHandler, PacketByteBuf packetByteBuf, PacketSender packetSender) {
-        Entity entity = serverPlayNetworkHandler.player.getWorld().getEntityById(packetByteBuf.readInt());
-        if (entity == null) {
-            LOGGER.debug("Entity not found for sync request");
-            return;
-        }
-        syncBody(entity, serverPlayNetworkHandler.player);
+        // Read off the network thread, then process on the server thread.
+        int entityId = packetByteBuf.readInt();
+        minecraftServer.execute(() -> {
+            Entity entity = serverPlayNetworkHandler.player.getWorld().getEntityById(entityId);
+            if (entity == null) {
+                LOGGER.debug("Entity not found for sync request");
+                return;
+            }
+            syncBody(entity, serverPlayNetworkHandler.player);
+        });
     }
 
     private static void syncBody(Entity entity, ServerPlayerEntity player) {
@@ -195,17 +198,29 @@ public class ServerNetworking {
             LOGGER.debug("Entity {} is not a BodyProvider", entity.getId());
             return;
         }
-        
-        PacketByteBuf buf = PacketByteBufs.create();
-        buf.writeInt(entity.getId());
-
         var body = ((BodyProvider)entity).getBody();
         if (body == null) {
             LOGGER.warn("Body is null for entity {}", entity.getId());
             return;
         }
+
+        PacketByteBuf buf = PacketByteBufs.create();
+        buf.writeInt(entity.getId());
+        writeBodyPayload(buf, body);
+        //Handled by ClientNetworking.updateEntity
+        ServerPlayNetworking.send(player, id("data_request"), buf);
+    }
+
+    /**
+     * Serialize the full body state into the buffer. A part-count prefix lets the client
+     * read a deterministic number of parts instead of parsing until a read fails.
+     * Must stay byte-for-byte in sync with ClientNetworking.readBodyPayload.
+     */
+    private static void writeBodyPayload(PacketByteBuf buf, Body body) {
         body.prepareBucketSync();
-        for (BodyPart part : body.getParts()) {
+        var parts = body.getParts();
+        buf.writeInt(parts.size());
+        for (BodyPart part : parts) {
             Identifier idf = part.getIdentifier();
             buf.writeIdentifier(idf);
             buf.writeFloat(part.getHealth());
@@ -221,25 +236,17 @@ public class ServerNetworking {
             buf.writeFloat(body.getAbsorptionForPart(idf));
             buf.writeFloat(body.getBoostForPart(idf));
             // wounds/tourniquet/necrosis extra payload
-            int s = part.getSmallWounds();
-            int l = part.getLargeWounds();
-            boolean tq = part.hasTourniquet();
-            int tqTicks = part.getTourniquetTicks();
-            int necState = part.getNecrosisState();
-            float necScale = part.getNecrosisScale();
-            buf.writeInt(s);
-            buf.writeInt(l);
-            buf.writeBoolean(tq);
-            buf.writeInt(tqTicks);
-            buf.writeInt(necState);
-            buf.writeFloat(necScale);
+            buf.writeInt(part.getSmallWounds());
+            buf.writeInt(part.getLargeWounds());
+            buf.writeBoolean(part.hasTourniquet());
+            buf.writeInt(part.getTourniquetTicks());
+            buf.writeInt(part.getNecrosisState());
+            buf.writeFloat(part.getNecrosisScale());
         }
         // Downed sync (server authoritative)
         buf.writeBoolean(body.isDowned());
         buf.writeInt(body.getBleedOutTicksRemaining());
         buf.writeBoolean(body.isBeingRevived());
-        //Handled by ClientNetworking.updateEntity
-        ServerPlayNetworking.send(player, id("data_request"), buf);
     }
 
     public static void broadcastBody(Entity entity) {
@@ -259,42 +266,37 @@ public class ServerNetworking {
             LOGGER.warn("Player {} is not a BodyProvider", self.getName().getString());
             return;
         }
-        PacketByteBuf buf = PacketByteBufs.create();
         var body = ((BodyProvider) self).getBody();
         if (body == null) {
             LOGGER.warn("Body is null for player {}", self.getName().getString());
             return;
         }
-        body.prepareBucketSync();
-        for (BodyPart part : body.getParts()) {
-            Identifier idf = part.getIdentifier();
-            buf.writeIdentifier(idf);
-            buf.writeFloat(part.getHealth());
-            buf.writeFloat(part.getMaxHealth());
-            buf.writeBoolean(part.isBroken());
-            boolean hasHalf = part.getBrokenTopHalf() != null;
-            buf.writeBoolean(hasHalf);
-            if (hasHalf) buf.writeBoolean(part.getBrokenTopHalf());
-            buf.writeBoolean(part.isFractureLocked());
-            buf.writeFloat(body.getAbsorptionForPart(idf));
-            buf.writeFloat(body.getBoostForPart(idf));
-            int s = part.getSmallWounds();
-            int l = part.getLargeWounds();
-            boolean tq = part.hasTourniquet();
-            int tqTicks = part.getTourniquetTicks();
-            int necState = part.getNecrosisState();
-            float necScale = part.getNecrosisScale();
-            buf.writeInt(s);
-            buf.writeInt(l);
-            buf.writeBoolean(tq);
-            buf.writeInt(tqTicks);
-            buf.writeInt(necState);
-            buf.writeFloat(necScale);
-        }
-        buf.writeBoolean(body.isDowned());
-        buf.writeInt(body.getBleedOutTicksRemaining());
-        buf.writeBoolean(body.isBeingRevived());
+        // Self channel: no entity id, client applies to client.player directly.
+        PacketByteBuf buf = PacketByteBufs.create();
+        writeBodyPayload(buf, body);
         ServerPlayNetworking.send(self, BHSMain.MOD_IDENTIFIER, buf);
+    }
+
+    /** Find and decrement one of the given item from the player's inventory. Returns false if absent. */
+    private static boolean consumeOne(ServerPlayerEntity player, ItemStack itemStack) {
+        var inv = player.getInventory();
+        if (inv.getMainHandStack().getItem() == itemStack.getItem()) {
+            inv.getMainHandStack().decrement(1);
+            return true;
+        }
+        int slot = inv.getSlotWithStack(itemStack);
+        if (slot >= 0) {
+            inv.getStack(slot).decrement(1);
+            return true;
+        }
+        return false;
+    }
+
+    /** True if the player currently holds the given item in hand or inventory. */
+    private static boolean hasItem(ServerPlayerEntity player, ItemStack itemStack) {
+        var inv = player.getInventory();
+        if (inv.getMainHandStack().getItem() == itemStack.getItem()) return true;
+        return inv.getSlotWithStack(itemStack) >= 0;
     }
 
     /**
@@ -302,48 +304,59 @@ public class ServerNetworking {
      * Validates all inputs before processing to prevent exploits.
      */
     private static void handleUseHealingItem(MinecraftServer minecraftServer, ServerPlayerEntity serverPlayerEntity, ServerPlayNetworkHandler serverPlayNetworkHandler, PacketByteBuf packetByteBuf, PacketSender packetSender) {
-        // Read and validate entity ID
+        // Read off the network thread; defer all world/inventory access to the server thread.
         int entityId = packetByteBuf.readInt();
+        Identifier partID = packetByteBuf.readIdentifier();
+        ItemStack itemStack = packetByteBuf.readItemStack();
+        minecraftServer.execute(() -> processHealingItem(serverPlayerEntity, entityId, partID, itemStack));
+    }
+
+    /**
+     * Apply a healing item to a body part. Runs on the server thread.
+     * Validates ownership and range before any effect so spoofed packets cannot grant free healing.
+     */
+    private static void processHealingItem(ServerPlayerEntity serverPlayerEntity, int entityId, Identifier partID, ItemStack itemStack) {
         Entity entity = serverPlayerEntity.getWorld().getEntityById(entityId);
         if (entity == null) {
             LOGGER.debug("Entity {} not found for healing item use", entityId);
             return;
         }
-        
-        // Validate entity is a BodyProvider
         if (!(entity instanceof BodyProvider)) {
             LOGGER.debug("Entity {} is not a BodyProvider", entityId);
             return;
         }
-        
+        // Anti-exploit: only operate on self or a nearby target (revival happens at melee range).
+        if (entity != serverPlayerEntity && serverPlayerEntity.squaredDistanceTo(entity) > 64.0) {
+            LOGGER.debug("Healing target {} out of range", entityId);
+            return;
+        }
+
         var body = ((BodyProvider) entity).getBody();
         if (body == null) {
             LOGGER.warn("Body is null for entity {}", entityId);
             return;
         }
-        
-        // Read and validate part ID
-        Identifier partID = packetByteBuf.readIdentifier();
+
         BodyPart part = body.getPart(partID);
         if (part == null) {
             LOGGER.debug("Part {} not found on entity {}", partID, entityId);
             return;
         }
-        
-        // Read and validate item stack
-        ItemStack itemStack = packetByteBuf.readItemStack();
+
         if (itemStack.isEmpty()) {
             LOGGER.debug("Empty item stack in healing request");
             return;
         }
-
-        // Guard: ignore empty or unknown items to prevent unintended healing
-        if (itemStack.isEmpty()) return;
+        // Anti-exploit: require the player to actually possess the item before applying any effect.
+        if (!hasItem(serverPlayerEntity, itemStack)) {
+            LOGGER.debug("Player {} does not hold the requested healing item", serverPlayerEntity.getName().getString());
+            return;
+        }
 
         boolean isUpgraded = itemStack.getItem() == ModItems.UPGRADED_MEDKIT_ITEM;
         boolean isPlaster = itemStack.getItem() == ModItems.PLASTER_ITEM;
-        boolean isStitches = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.STITCHES;
-        boolean isTourniquet = itemStack.getItem() == xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET;
+        boolean isStitches = itemStack.getItem() == ModItems.STITCHES;
+        boolean isTourniquet = itemStack.getItem() == ModItems.TOURNIQUET;
         boolean isMedkit = itemStack.getItem() == ModItems.MEDKIT_ITEM;
         boolean isPrimitiveMedkit = itemStack.getItem() == ModItems.PRIMITIVE_MEDKIT_ITEM;
 
@@ -368,13 +381,7 @@ public class ServerNetworking {
                 }
             }
             if (removed) {
-                // decrement
-                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
-                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
-                }else{
-                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
-                }
+                consumeOne(serverPlayerEntity, itemStack);
                 syncBody((PlayerEntity) entity);
             }
             return;
@@ -392,14 +399,7 @@ public class ServerNetworking {
             if (did) {
                 // Apply 50% max health debuff for 3 minutes to the treated limb
                 part.beginStitchDebuff();
-            }
-            if (did) {
-                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
-                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
-                }else{
-                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
-                }
+                consumeOne(serverPlayerEntity, itemStack);
                 syncBody((PlayerEntity) entity);
             }
             return;
@@ -434,15 +434,10 @@ public class ServerNetworking {
             }
             if (newState) {
                 // Applying tourniquet consumes one
-                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
-                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
-                }else{
-                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
-                }
+                consumeOne(serverPlayerEntity, itemStack);
             } else {
                 // Removing tourniquet returns the item
-                serverPlayerEntity.giveItemStack(new ItemStack(xyz.srgnis.bodyhealthsystem.registry.ModItems.TOURNIQUET));
+                serverPlayerEntity.giveItemStack(new ItemStack(ModItems.TOURNIQUET));
             }
             syncBody((PlayerEntity) entity);
             return;
@@ -465,12 +460,7 @@ public class ServerNetworking {
             }
 
             if (didSomething) {
-                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
-                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
-                }else{
-                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
-                }
+                consumeOne(serverPlayerEntity, itemStack);
                 if (entity instanceof PlayerEntity pe) syncBody(pe);
             }
             return;
@@ -541,12 +531,7 @@ public class ServerNetworking {
             }
 
             if (didSomething) {
-                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
-                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
-                }else{
-                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
-                }
+                consumeOne(serverPlayerEntity, itemStack);
                 syncBody((PlayerEntity) entity);
             }
             return;
@@ -586,12 +571,7 @@ public class ServerNetworking {
             }
 
             if (didSomething) {
-                if (serverPlayerEntity.getInventory().getMainHandStack().getItem() == itemStack.getItem()){
-                    serverPlayerEntity.getInventory().getMainHandStack().decrement(1);
-                }else{
-                    int slot = serverPlayerEntity.getInventory().getSlotWithStack(itemStack);
-                    if (slot >= 0) serverPlayerEntity.getInventory().getStack(slot).decrement(1);
-                }
+                consumeOne(serverPlayerEntity, itemStack);
                 syncBody((PlayerEntity) entity);
             }
             return;

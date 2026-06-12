@@ -177,58 +177,53 @@ public class ClientNetworking {
         return LAST_BODY_TEMP_C.get(entity.getId());
     }
 
-    // Shared body payload reader for both full-state packet handlers
+    // Shared body payload reader for both full-state packet handlers.
+    // Must stay byte-for-byte in sync with ServerNetworking.writeBodyPayload (part-count prefixed).
     private static void readBodyPayload(MinecraftClient client, Entity entity, PacketByteBuf buf) {
-        while (buf.isReadable()) {
-            int readerIndex = buf.readerIndex();
-            try {
-                Identifier idf = buf.readIdentifier();
-                float health = buf.readFloat();
-                float maxhealth = buf.readFloat();
-                boolean broken = buf.readBoolean();
-                boolean hasHalf = buf.readBoolean();
-                boolean topHalf = hasHalf && buf.readBoolean();
-                boolean fractureLocked = buf.readBoolean();
-                float partAbs = buf.readFloat();
-                float partBoost = buf.readFloat();
-                int sWounds = buf.readInt();
-                int lWounds = buf.readInt();
-                boolean tq = buf.readBoolean();
-                int tqTicks = buf.readInt();
-                int necState = buf.readInt();
-                float necScale = buf.readFloat();
-                client.execute(() -> {
-                    if (!(entity instanceof BodyProvider bp)) {
-                        LOGGER.debug("Entity is not a BodyProvider during body payload read");
-                        return;
-                    }
-                    var body = bp.getBody();
-                    if (body == null) {
-                        LOGGER.warn("Body is null during payload read");
-                        return;
-                    }
-                    var part = body.getPart(idf);
-                    if (part == null) {
-                        LOGGER.debug("Part {} not found during payload read", idf);
-                        return;
-                    }
-                    // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
-                    part.setMaxHealth(maxhealth);
-                    part.clientSetNecrosis(necState, necScale);
-                    body.clientSetAbsorptionBucket(idf, partAbs);
-                    body.clientSetBoostBucket(idf, partBoost);
-                    part.setHealth(health);
-                    part.setBroken(broken);
-                    part.setBrokenTopHalf(hasHalf ? topHalf : null);
-                    part.setFractureLocked(fractureLocked);
-                    part.clientSetWounds(sWounds, lWounds);
-                    part.clientSetTourniquet(tq, tqTicks);
-                });
-            } catch (Exception ex) {
-                LOGGER.debug("Exception reading body payload: {}", ex.getMessage());
-                buf.readerIndex(readerIndex);
-                break;
-            }
+        int count = buf.readInt();
+        for (int i = 0; i < count; i++) {
+            Identifier idf = buf.readIdentifier();
+            float health = buf.readFloat();
+            float maxhealth = buf.readFloat();
+            boolean broken = buf.readBoolean();
+            boolean hasHalf = buf.readBoolean();
+            boolean topHalf = hasHalf && buf.readBoolean();
+            boolean fractureLocked = buf.readBoolean();
+            float partAbs = buf.readFloat();
+            float partBoost = buf.readFloat();
+            int sWounds = buf.readInt();
+            int lWounds = buf.readInt();
+            boolean tq = buf.readBoolean();
+            int tqTicks = buf.readInt();
+            int necState = buf.readInt();
+            float necScale = buf.readFloat();
+            client.execute(() -> {
+                if (!(entity instanceof BodyProvider bp)) {
+                    LOGGER.debug("Entity is not a BodyProvider during body payload read");
+                    return;
+                }
+                var body = bp.getBody();
+                if (body == null) {
+                    LOGGER.warn("Body is null during payload read");
+                    return;
+                }
+                var part = body.getPart(idf);
+                if (part == null) {
+                    LOGGER.debug("Part {} not found during payload read", idf);
+                    return;
+                }
+                // Order matters: set base max, necrosis scale, then buckets, then health to avoid over/under clamp
+                part.setMaxHealth(maxhealth);
+                part.clientSetNecrosis(necState, necScale);
+                body.clientSetAbsorptionBucket(idf, partAbs);
+                body.clientSetBoostBucket(idf, partBoost);
+                part.setHealth(health);
+                part.setBroken(broken);
+                part.setBrokenTopHalf(hasHalf ? topHalf : null);
+                part.setFractureLocked(fractureLocked);
+                part.clientSetWounds(sWounds, lWounds);
+                part.clientSetTourniquet(tq, tqTicks);
+            });
         }
     }
 }
