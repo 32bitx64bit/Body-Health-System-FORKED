@@ -3,7 +3,7 @@ package xyz.srgnis.bodyhealthsystem.config;
 public class Config extends MidnightConfig {
 
     // Config versioning
-    public static final int CONFIG_VERSION_CURRENT = 3;
+    public static final int CONFIG_VERSION_CURRENT = 4;
     @Server @Entry public static int configVersion = 0;
 
     @Comment(centered = true) public static Comment comment_maxHealth;
@@ -76,6 +76,11 @@ public class Config extends MidnightConfig {
     @Comment(centered = true) public static Comment comment_wounds;
     // Master toggle for wounds/tourniquets/necrosis/bleeding
     @Entry public static boolean enableWoundingSystem = true;
+
+    @Comment(centered = true) public static Comment comment_projectiles;
+    // When enabled, projectile head hits have a chance to be redirected to the torso so headshots are less punishing.
+    // Disable for a harder experience where every detected headshot lands on the head.
+    @Entry public static boolean enableHeadHitRedirect = true;
 
     @Comment(centered = true) public static Comment comment_tempDisplay;
     @Entry public static TemperatureUnit temperatureUnit = TemperatureUnit.CELSIUS;
